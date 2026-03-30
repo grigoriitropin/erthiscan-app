@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.erthiscan"
+    namespace = "io.erthiscan"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -12,7 +12,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.erthiscan"
+        applicationId = "io.erthiscan"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -48,6 +48,10 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation("androidx.camera:camera-camera2:1.5.2")
+    implementation("androidx.camera:camera-lifecycle:1.5.2")
+    implementation("androidx.camera:camera-compose:1.5.2")
+    implementation("androidx.camera.viewfinder:viewfinder-compose:1.5.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
