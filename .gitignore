@@ -10,6 +10,7 @@
 /.idea/compiler.xml                                                                                                                                                                                            
 /.idea/AndroidProjectSystem.xml
 /.idea/vcs.xml
+/.idea/deploymentTargetSelector.xml
 .DS_Store
 /build
 /captures
