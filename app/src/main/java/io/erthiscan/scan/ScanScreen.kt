@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.sp
 fun ScanScreen() {
     var isTorchOn by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) }
+    var scannedBarcode by remember { mutableStateOf<String?>(null) }
     val vibrator = (LocalContext.current.getSystemService(VibratorManager::class.java))
         .defaultVibrator
 
@@ -62,6 +63,7 @@ fun ScanScreen() {
 
         CameraPreview(torchEnabled = isTorchOn) { barcode ->
             Log.d("ErthiScan", "Scanned: $barcode")
+            scannedBarcode = barcode
         }
 
         Column(
@@ -134,6 +136,15 @@ fun ScanScreen() {
                     selectedTab = it
                 })
             }
+        }
+
+        scannedBarcode?.let { barcode ->
+            ProductSheet(
+                productName = "Mock Product",
+                companyName = "Mock Company",
+                barcode = barcode,
+                onDismiss = { scannedBarcode = null }
+            )
         }
     }
 }
