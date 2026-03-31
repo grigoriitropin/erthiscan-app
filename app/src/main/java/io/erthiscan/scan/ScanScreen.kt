@@ -52,6 +52,8 @@ fun ScanScreen() {
     var isTorchOn by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) }
     var scannedBarcode by remember { mutableStateOf<String?>(null) }
+    var scanResult by remember { mutableStateOf<io.erthiscan.api.ScanResponse?>(null) }
+    var scanError by remember { mutableStateOf<String?>(null) }
     val vibrator = (LocalContext.current.getSystemService(VibratorManager::class.java))
         .defaultVibrator
 
@@ -139,11 +141,27 @@ fun ScanScreen() {
         }
 
         scannedBarcode?.let { barcode ->
+            LaunchedEffect(barcode) {
+                try {
+                    scanResult = io.erthiscan.api.ApiClient.api.scanBarcode(io.erthiscan.api.ScanBarcodeRequest(barcode))
+                    scanError = null
+                } catch (e: Exception) {
+                    Log.e("ErthiScan", "API error", e)
+                    scanError = e.message
+                    scanResult = null
+                }
+            }
+        }
+
+        scanResult?.let { result ->
             ProductSheet(
-                productName = "Mock Product",
-                companyName = "Mock Company",
-                barcode = barcode,
-                onDismiss = { scannedBarcode = null }
+                productName = result.product.name,
+                companyName = result.company.name,
+                barcode = result.product.barcode,
+                onDismiss = {
+                    scannedBarcode = null
+                    scanResult = null
+                }
             )
         }
     }
@@ -172,7 +190,7 @@ fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
                 .width(indicatorWidth)
                 .height(32.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(Color.Black.copy(alpha = 0.6f))
+                .background(Color.Black.copy(alpha = 0.85f))
         )
 
         Row {
