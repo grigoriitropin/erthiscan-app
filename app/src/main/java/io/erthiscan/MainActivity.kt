@@ -15,7 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
-import io.erthiscan.scan.CameraPreview
+import io.erthiscan.scan.ScanScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
                     .background(Color.Black)
             ) {
                 if (hasCameraPermission) {
-                    CameraPreview()
+                    ScanScreen()
                 }
             }
         }
