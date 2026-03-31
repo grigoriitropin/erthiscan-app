@@ -1,6 +1,7 @@
 package io.erthiscan.scan
 
 import androidx.camera.compose.CameraXViewfinder
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -16,7 +17,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 
 @Composable
-fun CameraPreview(onBarcodeScanned: (String) -> Unit) {
+fun CameraPreview(torchEnabled: Boolean = false, onBarcodeScanned: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { ContextCompat.getMainExecutor(context) }
@@ -26,6 +27,7 @@ fun CameraPreview(onBarcodeScanned: (String) -> Unit) {
     var candidateCount by remember { mutableStateOf(0) }
     var confirmedValue by remember { mutableStateOf<String?>(null) }
     var surfaceRequest by remember { mutableStateOf<SurfaceRequest?>(null) }
+    var camera by remember { mutableStateOf<Camera?>(null) }
 
     val preview = remember {
         Preview.Builder().build().apply {
@@ -83,12 +85,16 @@ fun CameraPreview(onBarcodeScanned: (String) -> Unit) {
     LaunchedEffect(Unit) {
         val cameraProvider = ProcessCameraProvider.getInstance(context).get()
         cameraProvider.unbindAll()
-        cameraProvider.bindToLifecycle(
+        camera = cameraProvider.bindToLifecycle(
             lifecycleOwner,
             CameraSelector.DEFAULT_BACK_CAMERA,
             preview,
             imageAnalysis
         )
+    }
+
+    LaunchedEffect(torchEnabled) {
+        camera?.cameraControl?.enableTorch(torchEnabled)
     }
 
     surfaceRequest?.let { request ->
