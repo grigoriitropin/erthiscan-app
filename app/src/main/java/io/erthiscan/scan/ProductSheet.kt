@@ -1,5 +1,6 @@
 package io.erthiscan.scan
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,6 +52,7 @@ fun ProductSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
+                    .background(colorScheme.surfaceContainerHigh)
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -78,6 +80,7 @@ fun ProductSheet(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(16.dp))
+                        .background(colorScheme.surfaceContainerHigh)
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -90,6 +93,7 @@ fun ProductSheet(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(16.dp))
+                        .background(colorScheme.surfaceContainerHigh)
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -106,8 +110,8 @@ fun ProductSheet(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = colorScheme.surfaceContainerHighest,
-                    contentColor = colorScheme.onSurface
+                    containerColor = colorScheme.primaryContainer,
+                    contentColor = colorScheme.onPrimaryContainer
                 )
             ) {
                 Text(
@@ -124,8 +128,8 @@ fun ProductSheet(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = colorScheme.surfaceContainerHighest,
-                    contentColor = colorScheme.onSurface
+                    containerColor = colorScheme.primaryContainer,
+                    contentColor = colorScheme.onPrimaryContainer
                 )
             ) {
                 Text(
