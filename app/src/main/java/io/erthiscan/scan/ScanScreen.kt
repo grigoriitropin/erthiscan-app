@@ -38,6 +38,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -178,10 +181,12 @@ fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     val indicatorOffset = lerp(0.dp, tabWidths[0], animationProgress)
     val indicatorWidth = lerp(tabWidths[0], tabWidths[1], animationProgress)
 
+    val colorScheme = MaterialTheme.colorScheme
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(24.dp))
-            .background(Color.Black.copy(alpha = 0.5f))
+            .background(colorScheme.surface.copy(alpha = 0.5f))
             .padding(4.dp)
     ) {
         Box(
@@ -190,7 +195,7 @@ fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
                 .width(indicatorWidth)
                 .height(32.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(Color.Black.copy(alpha = 0.85f))
+                .background(colorScheme.surface.copy(alpha = 0.85f))
         )
 
         Row {
@@ -201,11 +206,14 @@ fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
                         .width(tabWidths[index])
                         .height(32.dp)
                         .clip(RoundedCornerShape(20.dp))
-                        .clickable { onTabSelected(index) }
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) { onTabSelected(index) }
                 ) {
                     Text(
                         text = title,
-                        color = Color.White,
+                        color = if (selectedTab == index) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
                         fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
                     )

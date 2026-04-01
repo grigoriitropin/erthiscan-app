@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
+            io.erthiscan.ui.ErthiScanTheme {
             var hasCameraPermission by remember {
                 mutableStateOf(
                     ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -48,6 +49,7 @@ class MainActivity : ComponentActivity() {
                 if (hasCameraPermission) {
                     ScanScreen()
                 }
+            }
             }
         }
     }
