@@ -1,5 +1,7 @@
 package io.erthiscan.scan
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,21 +22,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductSheet(
     productName: String,
     companyName: String,
+    companyId: Int,
+    ethicalScore: Float,
+    hasReports: Boolean,
+    openFactsUrl: String?,
     barcode: String,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onViewCompany: (Int) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val colorScheme = MaterialTheme.colorScheme
+    val context = LocalContext.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -62,12 +73,26 @@ fun ProductSheet(
                     fontSize = 14.sp
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Coming Soon",
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                if (hasReports) {
+                    val displayScore = ((ethicalScore.coerceIn(-100f, 100f) + 100f) / 2f).roundToInt()
+                    val red = Color(0xFFE53935)
+                    val yellow = Color(0xFFFFB300)
+                    val green = Color(0xFF43A047)
+                    val t = displayScore / 100f
+                    val scoreColor = if (t < 0.5f) lerp(red, yellow, t * 2f) else lerp(yellow, green, (t - 0.5f) * 2f)
+                    Text(
+                        text = displayScore.toString(),
+                        color = scoreColor,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Text(
+                        text = "—",
+                        color = colorScheme.onSurfaceVariant,
+                        fontSize = 28.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -106,7 +131,10 @@ fun ProductSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             Button(
-                onClick = { /* TODO */ },
+                onClick = {
+                    onDismiss()
+                    onViewCompany(companyId)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -123,20 +151,24 @@ fun ProductSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Button(
-                onClick = { /* TODO */ },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = colorScheme.primaryContainer,
-                    contentColor = colorScheme.onPrimaryContainer
-                )
-            ) {
-                Text(
-                    text = "Product Information Source",
-                    fontSize = 16.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
+            if (openFactsUrl != null) {
+                Button(
+                    onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(openFactsUrl)))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorScheme.primaryContainer,
+                        contentColor = colorScheme.onPrimaryContainer
+                    )
+                ) {
+                    Text(
+                        text = "Product Information Source",
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
             }
         }
     }

@@ -54,7 +54,7 @@ import io.erthiscan.api.ScanBarcodeRequest
 import io.erthiscan.api.ScanResponse
 
 @Composable
-fun ScanScreen() {
+fun ScanScreen(onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> }) {
     var isTorchOn by remember { mutableStateOf(false) }
     var scannedBarcode by remember { mutableStateOf<String?>(null) }
     var scanResult by remember { mutableStateOf<ScanResponse?>(null) }
@@ -152,11 +152,16 @@ fun ScanScreen() {
             ProductSheet(
                 productName = result.product.name,
                 companyName = result.company.name,
+                companyId = result.company.id,
+                ethicalScore = result.company.ethicalScore,
+                hasReports = result.company.ethicalScore != 0f,
+                openFactsUrl = result.product.openFactsUrl,
                 barcode = result.product.barcode,
                 onDismiss = {
                     scannedBarcode = null
                     scanResult = null
-                }
+                },
+                onViewCompany = { companyId -> onViewCompany(result, companyId) }
             )
         }
     }

@@ -40,3 +40,38 @@ data class AuthResponse(
     @SerialName("user_id") val userId: Int,
     val username: String
 )
+
+@Serializable
+data class CompaniesResponse(
+    val items: List<CompanyItem>,
+    val total: Int,
+    val page: Int,
+    val pages: Int
+)
+
+@Serializable
+data class CompanyItem(
+    val id: Int,
+    val name: String,
+    @SerialName("ethical_score") val ethicalScore: Float,
+    @SerialName("has_reports") val hasReports: Boolean
+)
+
+@Serializable
+data class CompanyDetail(
+    val id: Int,
+    val name: String,
+    @SerialName("ethical_score") val ethicalScore: Float,
+    @SerialName("report_count") val reportCount: Int,
+    val reports: List<ReportItem>
+)
+
+@Serializable
+data class ReportItem(
+    val id: Int,
+    val text: String,
+    val sources: List<String>,
+    val author: String,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("vote_sum") val voteSum: Int
+)
