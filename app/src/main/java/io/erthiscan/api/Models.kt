@@ -28,3 +28,15 @@ data class CompanyData(
     val name: String,
     @SerialName("ethical_score") val ethicalScore: Float = 0f
 )
+
+@Serializable
+data class GoogleAuthRequest(
+    val token: String
+)
+
+@Serializable
+data class AuthResponse(
+    @SerialName("access_token") val accessToken: String,
+    @SerialName("user_id") val userId: Int,
+    val username: String
+)

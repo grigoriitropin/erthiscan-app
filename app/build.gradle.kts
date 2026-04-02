@@ -22,6 +22,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "API_BASE_URL", "\"https://pjdth.xyz/\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"259326100415-4dm2us789q9mq1rp3kingobb30eka8h4.apps.googleusercontent.com\"")
     }
 
     buildTypes {
@@ -65,6 +66,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    implementation("androidx.credentials:credentials:1.6.0-rc02")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0-rc02")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
+    implementation("androidx.datastore:datastore-preferences:1.1.4")
+    implementation("com.google.crypto.tink:tink-android:1.17.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

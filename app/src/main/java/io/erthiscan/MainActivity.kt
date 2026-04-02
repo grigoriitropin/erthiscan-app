@@ -15,7 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
-import io.erthiscan.scan.ScanScreen
+import io.erthiscan.auth.AuthManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,6 +23,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             io.erthiscan.ui.ErthiScanTheme {
+            val context = this@MainActivity
+            LaunchedEffect(Unit) {
+                AuthManager.restore(context)
+            }
             var hasCameraPermission by remember {
                 mutableStateOf(
                     ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -47,7 +51,7 @@ class MainActivity : ComponentActivity() {
                     .background(Color.Black)
             ) {
                 if (hasCameraPermission) {
-                    ScanScreen()
+                    MainScreen()
                 }
             }
             }

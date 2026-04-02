@@ -49,14 +49,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
+import io.erthiscan.api.ApiClient
+import io.erthiscan.api.ScanBarcodeRequest
+import io.erthiscan.api.ScanResponse
 
 @Composable
 fun ScanScreen() {
     var isTorchOn by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableStateOf(0) }
     var scannedBarcode by remember { mutableStateOf<String?>(null) }
-    var scanResult by remember { mutableStateOf<io.erthiscan.api.ScanResponse?>(null) }
-    var scanError by remember { mutableStateOf<String?>(null) }
+    var scanResult by remember { mutableStateOf<ScanResponse?>(null) }
     val vibrator = (LocalContext.current.getSystemService(VibratorManager::class.java))
         .defaultVibrator
 
@@ -132,25 +133,16 @@ fun ScanScreen() {
                 }
             }
 
-            Box(
-                modifier = Modifier.weight(0.4f).fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                TabBar(selectedTab = selectedTab, onTabSelected = {
-                    vibrator.vibrate(VibrationEffect.createOneShot(30, 50))
-                    selectedTab = it
-                })
-            }
+            // Space for tab bar overlay
+            Box(modifier = Modifier.weight(0.4f).fillMaxWidth())
         }
 
         scannedBarcode?.let { barcode ->
             LaunchedEffect(barcode) {
                 try {
-                    scanResult = io.erthiscan.api.ApiClient.api.scanBarcode(io.erthiscan.api.ScanBarcodeRequest(barcode))
-                    scanError = null
+                    scanResult = ApiClient.api.scanBarcode(ScanBarcodeRequest(barcode))
                 } catch (e: Exception) {
                     Log.e("ErthiScan", "API error", e)
-                    scanError = e.message
                     scanResult = null
                 }
             }
@@ -172,21 +164,27 @@ fun ScanScreen() {
 
 @Composable
 fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
-    val tabs = listOf("Scan", "Companies")
-    val tabWidths = listOf(80.dp, 110.dp)
+    val tabs = listOf("Companies", "Scan", "Profile")
+    val tabWidths = listOf(110.dp, 80.dp, 80.dp)
     val animationProgress by animateFloatAsState(
         targetValue = selectedTab.toFloat(),
         animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
     )
-    val indicatorOffset = lerp(0.dp, tabWidths[0], animationProgress)
-    val indicatorWidth = lerp(tabWidths[0], tabWidths[1], animationProgress)
+    val indicatorOffset = when {
+        animationProgress <= 1f -> lerp(0.dp, tabWidths[0], animationProgress)
+        else -> tabWidths[0] + lerp(0.dp, tabWidths[1], animationProgress - 1f)
+    }
+    val indicatorWidth = when {
+        animationProgress <= 1f -> lerp(tabWidths[0], tabWidths[1], animationProgress)
+        else -> lerp(tabWidths[1], tabWidths[2], animationProgress - 1f)
+    }
 
     val colorScheme = MaterialTheme.colorScheme
 
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(24.dp))
-            .background(colorScheme.surface.copy(alpha = 0.5f))
+            .background(colorScheme.surfaceContainerHighest.copy(alpha = 0.85f))
             .padding(4.dp)
     ) {
         Box(
@@ -195,7 +193,7 @@ fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
                 .width(indicatorWidth)
                 .height(32.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(colorScheme.surface.copy(alpha = 0.85f))
+                .background(colorScheme.primaryContainer)
         )
 
         Row {
