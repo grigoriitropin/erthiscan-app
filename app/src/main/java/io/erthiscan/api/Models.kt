@@ -26,7 +26,8 @@ data class ProductData(
 data class CompanyData(
     val id: Int,
     val name: String,
-    @SerialName("ethical_score") val ethicalScore: Float = 0f
+    @SerialName("ethical_score") val ethicalScore: Float = 0f,
+    @SerialName("report_count") val reportCount: Int = 0
 )
 
 @Serializable

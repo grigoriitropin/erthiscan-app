@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,7 +57,13 @@ fun ProfileScreen() {
             .background(colorScheme.background)
     ) {
         if (AuthManager.isLoggedIn) {
-            LoggedInProfile()
+            var showReports by remember { mutableStateOf(false) }
+
+            if (showReports) {
+                MyReportsScreen(onBack = { showReports = false })
+            } else {
+                LoggedInProfile(onShowReports = { showReports = true })
+            }
         } else {
             SignInScreen()
         }
@@ -64,7 +71,7 @@ fun ProfileScreen() {
 }
 
 @Composable
-private fun LoggedInProfile() {
+private fun LoggedInProfile(onShowReports: () -> Unit) {
     val colorScheme = MaterialTheme.colorScheme
     val activity = LocalContext.current as ComponentActivity
     val scope = activity.lifecycleScope
@@ -82,43 +89,125 @@ private fun LoggedInProfile() {
         modifier = Modifier
             .fillMaxSize()
             .systemBarsPadding()
+            .padding(horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Header
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = profile?.username ?: AuthManager.username ?: "",
-                color = colorScheme.onBackground,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
+        Spacer(modifier = Modifier.weight(1f))
 
-            if (profile != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${profile!!.reportCount} reports",
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp
-                )
-            }
+        Text(
+            text = profile?.username ?: AuthManager.username ?: "",
+            color = colorScheme.onBackground,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        if (profile != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${profile!!.reportCount} reports",
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 14.sp
+            )
         }
 
-        // Reports list
-        if (profile != null && profile!!.reports.isNotEmpty()) {
-            Text(
-                text = "Your Reports",
-                color = colorScheme.onBackground,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp)
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onShowReports,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colorScheme.primaryContainer,
+                contentColor = colorScheme.onPrimaryContainer
             )
+        ) {
+            Text(
+                text = "My Reports",
+                fontSize = 16.sp,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
 
-            Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
+        Button(
+            onClick = { scope.launch { AuthManager.logout(activity) } },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colorScheme.errorContainer,
+                contentColor = colorScheme.onErrorContainer
+            )
+        ) {
+            Text(
+                text = "Sign Out",
+                fontSize = 16.sp,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1.5f))
+    }
+}
+
+@Composable
+private fun MyReportsScreen(onBack: () -> Unit) {
+    val colorScheme = MaterialTheme.colorScheme
+    var profile by remember { mutableStateOf<UserProfile?>(null) }
+
+    LaunchedEffect(Unit) {
+        try {
+            profile = ApiClient.api.getMyProfile()
+        } catch (e: Exception) {
+            Log.e("ErthiScan", "Failed to load reports", e)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colorScheme.background)
+            .systemBarsPadding()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "←",
+                color = colorScheme.onBackground,
+                fontSize = 24.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onBack() }
+                    .padding(8.dp)
+            )
+            Text(
+                text = "My Reports",
+                color = colorScheme.onBackground,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+
+        if (profile == null) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Loading...", color = colorScheme.onSurfaceVariant)
+            }
+        } else if (profile!!.reports.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No reports yet", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+            }
+        } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -170,40 +259,6 @@ private fun LoggedInProfile() {
 
                 item { Spacer(modifier = Modifier.height(80.dp)) }
             }
-        } else if (profile != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No reports yet",
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp
-                )
-            }
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
-        }
-
-        // Sign out button
-        Button(
-            onClick = { scope.launch { AuthManager.logout(activity) } },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = colorScheme.errorContainer,
-                contentColor = colorScheme.onErrorContainer
-            )
-        ) {
-            Text(
-                text = "Sign Out",
-                fontSize = 16.sp,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
         }
     }
 }
