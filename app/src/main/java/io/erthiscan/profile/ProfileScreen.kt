@@ -2,10 +2,11 @@ package io.erthiscan.profile
 
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -163,35 +164,21 @@ private fun MyReportsScreen(onBack: () -> Unit) {
         }
     }
 
+    BackHandler { onBack() }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(colorScheme.background)
             .systemBarsPadding()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "←",
-                color = colorScheme.onBackground,
-                fontSize = 24.sp,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onBack() }
-                    .padding(8.dp)
-            )
-            Text(
-                text = "My Reports",
-                color = colorScheme.onBackground,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 8.dp)
-            )
-        }
+        Text(
+            text = "My Reports",
+            color = colorScheme.onBackground,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        )
 
         if (profile == null) {
             Box(
