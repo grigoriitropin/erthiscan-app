@@ -37,6 +37,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -277,6 +279,7 @@ private fun ReportCardWithSubs(
     val colorScheme = MaterialTheme.colorScheme
     val activity = LocalContext.current as ComponentActivity
     val scope = activity.lifecycleScope
+    val uriHandler = LocalUriHandler.current
     var ethicalCount by remember(report.id) { mutableIntStateOf(report.ethicalCount) }
     var unethicalCount by remember(report.id) { mutableIntStateOf(report.unethicalCount) }
     var userVote by remember(report.id) { mutableStateOf(report.userVote) }
@@ -312,12 +315,17 @@ private fun ReportCardWithSubs(
         if (report.sources.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
             report.sources.forEach { source ->
+                val uri = if (source.startsWith("http://") || source.startsWith("https://")) source else "https://$source"
                 Text(
                     text = source,
                     color = colorScheme.primary,
                     fontSize = 12.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable {
+                        try { uriHandler.openUri(uri) } catch (_: Exception) {}
+                    }
                 )
             }
         }
@@ -427,6 +435,7 @@ private fun SubReportCard(sub: SubReportItem) {
     val colorScheme = MaterialTheme.colorScheme
     val activity = LocalContext.current as ComponentActivity
     val scope = activity.lifecycleScope
+    val uriHandler = LocalUriHandler.current
     var trueCount by remember(sub.id) { mutableIntStateOf(sub.trueCount) }
     var falseCount by remember(sub.id) { mutableIntStateOf(sub.falseCount) }
     var userVote by remember(sub.id) { mutableStateOf(sub.userVote) }
@@ -453,12 +462,17 @@ private fun SubReportCard(sub: SubReportItem) {
         if (sub.sources.isNotEmpty()) {
             Spacer(modifier = Modifier.height(4.dp))
             sub.sources.forEach { source ->
+                val uri = if (source.startsWith("http://") || source.startsWith("https://")) source else "https://$source"
                 Text(
                     text = source,
                     color = colorScheme.primary,
                     fontSize = 11.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable {
+                        try { uriHandler.openUri(uri) } catch (_: Exception) {}
+                    }
                 )
             }
         }
