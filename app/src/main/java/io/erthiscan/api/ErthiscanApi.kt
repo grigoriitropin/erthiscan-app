@@ -24,4 +24,16 @@ interface ErthiscanApi {
 
     @GET("companies/{id}")
     suspend fun getCompany(@Path("id") id: Int): CompanyDetail
+
+    @POST("auth/logout")
+    suspend fun logout(): Unit
+
+    @POST("reports")
+    suspend fun createReport(@Body request: CreateReportRequest): Unit
+
+    @POST("reports/{id}/vote")
+    suspend fun vote(@Path("id") reportId: Int, @Body request: VoteRequest): VoteResponse
+
+    @GET("reports/me")
+    suspend fun getMyProfile(): UserProfile
 }

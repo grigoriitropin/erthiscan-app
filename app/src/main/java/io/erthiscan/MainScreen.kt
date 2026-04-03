@@ -55,7 +55,7 @@ fun MainScreen() {
             companyName = result.company.name,
             companyId = result.company.id,
             ethicalScore = result.company.ethicalScore,
-            hasReports = result.company.ethicalScore != 0f,
+            hasReports = result.company.reportCount > 0,
             openFactsUrl = result.product.openFactsUrl,
             barcode = result.product.barcode,
             onDismiss = { savedScanResult = null },

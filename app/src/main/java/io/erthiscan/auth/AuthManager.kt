@@ -15,6 +15,7 @@ import com.google.crypto.tink.integration.android.AndroidKeysetManager
 import kotlinx.coroutines.flow.first
 import android.util.Base64
 import android.util.Log
+import io.erthiscan.api.ApiClient
 
 private val Context.authDataStore by preferencesDataStore(name = "auth")
 
@@ -84,6 +85,13 @@ object AuthManager {
     }
 
     suspend fun logout(context: Context) {
+        if (accessToken != null) {
+            try {
+                ApiClient.api.logout()
+            } catch (e: Exception) {
+                Log.e("AuthManager", "Failed to call server logout", e)
+            }
+        }
         accessToken = null
         userId = null
         username = null
