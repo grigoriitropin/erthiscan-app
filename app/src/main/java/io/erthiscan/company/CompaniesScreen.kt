@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +41,6 @@ import androidx.compose.ui.unit.sp
 import io.erthiscan.api.ApiClient
 import io.erthiscan.api.CompanyItem
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 @Composable
@@ -48,31 +48,36 @@ fun CompaniesScreen(onCompanyClick: (Int) -> Unit = {}) {
     val colorScheme = MaterialTheme.colorScheme
     var companies by remember { mutableStateOf<List<CompanyItem>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
+    var debouncedQuery by remember { mutableStateOf("") }
     var sortMode by remember { mutableStateOf("reports_desc") }
     var currentPage by remember { mutableIntStateOf(1) }
     var totalPages by remember { mutableIntStateOf(1) }
-    var pageResetKey by remember { mutableIntStateOf(0) }
+    var loading by remember { mutableStateOf(true) }
+    val listState = rememberLazyListState()
 
-    LaunchedEffect(searchQuery, sortMode) {
-        currentPage = 1
-        pageResetKey++
+    // Debounce search input
+    LaunchedEffect(searchQuery) {
+        if (searchQuery != debouncedQuery) {
+            kotlinx.coroutines.delay(300)
+            debouncedQuery = searchQuery
+            currentPage = 1
+        }
     }
 
-    LaunchedEffect(pageResetKey, currentPage) {
-        delay(300)
+    // Load data immediately when debounced query, sort, or page changes
+    LaunchedEffect(debouncedQuery, sortMode, currentPage) {
+        loading = true
         try {
-            val response = ApiClient.api.getCompanies(
-                search = searchQuery,
-                sort = sortMode,
-                page = currentPage
-            )
+            val response = ApiClient.api.getCompanies(search = debouncedQuery, sort = sortMode, page = currentPage)
             companies = response.items
             totalPages = response.pages
+            listState.scrollToItem(0)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.e("ErthiScan", "Failed to load companies", e)
         }
+        loading = false
     }
 
     Column(
@@ -125,16 +130,26 @@ fun CompaniesScreen(onCompanyClick: (Int) -> Unit = {}) {
                 .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SortChip("Reports", "reports_desc", sortMode) { sortMode = it }
-            SortChip("Score ↓", "score_desc", sortMode) { sortMode = it }
-            SortChip("Score ↑", "score_asc", sortMode) { sortMode = it }
-            SortChip("A → Z", "name_asc", sortMode) { sortMode = it }
-            SortChip("Z → A", "name_desc", sortMode) { sortMode = it }
+            SortChip("Reports", "reports_desc", sortMode) { sortMode = it; currentPage = 1 }
+            SortChip("Score ↓", "score_desc", sortMode) { sortMode = it; currentPage = 1 }
+            SortChip("Score ↑", "score_asc", sortMode) { sortMode = it; currentPage = 1 }
+            SortChip("A → Z", "name_asc", sortMode) { sortMode = it; currentPage = 1 }
+            SortChip("Z → A", "name_desc", sortMode) { sortMode = it; currentPage = 1 }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        LazyColumn(
+        if (loading && companies.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Loading...", color = colorScheme.onSurfaceVariant)
+            }
+        } else LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
