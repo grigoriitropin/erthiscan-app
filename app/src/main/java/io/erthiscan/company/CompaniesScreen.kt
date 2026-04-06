@@ -237,6 +237,11 @@ private fun CompanyRow(company: CompanyItem, onClick: () -> Unit) {
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
             )
+            Text(
+                text = "${company.reportCount} reports",
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 12.sp
+            )
         }
 
         Spacer(modifier = Modifier.width(12.dp))

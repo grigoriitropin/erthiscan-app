@@ -24,7 +24,7 @@ import io.erthiscan.scan.ProductSheet
 import io.erthiscan.scan.ScanScreen
 import io.erthiscan.scan.TabBar
 
-enum class CompanySource { LIST, SCAN }
+enum class CompanySource { LIST, SCAN, PROFILE }
 
 @Composable
 fun MainScreen() {
@@ -32,6 +32,7 @@ fun MainScreen() {
     var openCompanyId by remember { mutableStateOf<Int?>(null) }
     var companySource by remember { mutableStateOf(CompanySource.LIST) }
     var savedScanResult by remember { mutableStateOf<ScanResponse?>(null) }
+    var profileShowReports by remember { mutableStateOf(false) }
     val vibrator = (LocalContext.current.getSystemService(VibratorManager::class.java))
         .defaultVibrator
 
@@ -77,7 +78,14 @@ fun MainScreen() {
                 companySource = CompanySource.SCAN
                 openCompanyId = companyId
             })
-            2 -> ProfileScreen()
+            2 -> ProfileScreen(
+                showReports = profileShowReports,
+                onShowReportsChange = { profileShowReports = it },
+                onCompanyClick = {
+                    companySource = CompanySource.PROFILE
+                    openCompanyId = it
+                }
+            )
         }
 
         Box(

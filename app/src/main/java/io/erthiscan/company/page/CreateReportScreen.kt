@@ -2,6 +2,7 @@ package io.erthiscan.company.page
 
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,38 +58,25 @@ fun CreateReportScreen(
 
     val title = if (parentId != null) "Challenge Report" else "Add Report"
 
+    BackHandler { onBack() }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(colorScheme.background)
             .systemBarsPadding()
     ) {
-        Row(
+        Text(
+            text = title,
+            color = colorScheme.onBackground,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "←",
-                color = colorScheme.onBackground,
-                fontSize = 24.sp,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onBack() }
-                    .padding(8.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = title,
-                color = colorScheme.onBackground,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-        }
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        )
 
         Text(
             text = companyName,

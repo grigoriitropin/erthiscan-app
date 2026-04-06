@@ -25,6 +25,9 @@ interface ErthiscanApi {
     @GET("companies/{id}")
     suspend fun getCompany(@Path("id") id: Int): CompanyDetail
 
+    @POST("auth/refresh")
+    suspend fun refresh(@Body request: RefreshRequest): RefreshResponse
+
     @POST("auth/logout")
     suspend fun logout(): Unit
 
