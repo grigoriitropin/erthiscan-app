@@ -13,6 +13,7 @@ import com.google.crypto.tink.aead.AeadConfig
 import com.google.crypto.tink.aead.AeadKeyTemplates
 import com.google.crypto.tink.integration.android.AndroidKeysetManager
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import android.util.Base64
 import android.util.Log
 import io.erthiscan.api.ApiClient
@@ -22,6 +23,8 @@ private val Context.authDataStore by preferencesDataStore(name = "auth")
 object AuthManager {
     var accessToken: String? by mutableStateOf(null)
         private set
+    var refreshToken: String? by mutableStateOf(null)
+        private set
     var userId: Int? by mutableStateOf(null)
         private set
     var username: String? by mutableStateOf(null)
@@ -30,8 +33,11 @@ object AuthManager {
     val isLoggedIn: Boolean get() = accessToken != null
 
     private val KEY_TOKEN = stringPreferencesKey("token")
+    private val KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
     private val KEY_USER_ID = intPreferencesKey("user_id")
     private val KEY_USERNAME = stringPreferencesKey("username")
+
+    private var appContext: Context? = null
 
     private fun getAead(context: Context): Aead {
         AeadConfig.register()
@@ -54,28 +60,52 @@ object AuthManager {
         return String(aead.decrypt(decoded, null))
     }
 
-    suspend fun login(token: String, id: Int, name: String, context: Context) {
+    suspend fun login(token: String, refresh: String, id: Int, name: String, context: Context) {
+        appContext = context.applicationContext
         accessToken = token
+        refreshToken = refresh
         userId = id
         username = name
 
         val aead = getAead(context)
         context.authDataStore.edit { prefs ->
             prefs[KEY_TOKEN] = encrypt(aead, token)
+            prefs[KEY_REFRESH_TOKEN] = encrypt(aead, refresh)
             prefs[KEY_USER_ID] = id
             prefs[KEY_USERNAME] = encrypt(aead, name)
         }
     }
 
+    fun updateTokens(access: String, refresh: String) {
+        accessToken = access
+        refreshToken = refresh
+
+        val ctx = appContext ?: return
+        try {
+            val aead = getAead(ctx)
+            runBlocking {
+                ctx.authDataStore.edit { prefs ->
+                    prefs[KEY_TOKEN] = encrypt(aead, access)
+                    prefs[KEY_REFRESH_TOKEN] = encrypt(aead, refresh)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("AuthManager", "Failed to persist refreshed tokens", e)
+        }
+    }
+
     suspend fun restore(context: Context) {
+        appContext = context.applicationContext
         val aead = getAead(context)
         val prefs = context.authDataStore.data.first()
         val encryptedToken = prefs[KEY_TOKEN] ?: return
+        val encryptedRefresh = prefs[KEY_REFRESH_TOKEN] ?: return
         val encryptedName = prefs[KEY_USERNAME] ?: return
         val id = prefs[KEY_USER_ID] ?: return
 
         try {
             accessToken = decrypt(aead, encryptedToken)
+            refreshToken = decrypt(aead, encryptedRefresh)
             userId = id
             username = decrypt(aead, encryptedName)
         } catch (e: Exception) {
@@ -93,6 +123,7 @@ object AuthManager {
             }
         }
         accessToken = null
+        refreshToken = null
         userId = null
         username = null
         context.authDataStore.edit { it.clear() }

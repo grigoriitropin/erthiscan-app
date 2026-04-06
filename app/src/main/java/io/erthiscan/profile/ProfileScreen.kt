@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 
 import androidx.compose.foundation.layout.Box
@@ -49,7 +50,11 @@ import io.erthiscan.auth.AuthManager
 import kotlinx.coroutines.launch
 
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(
+    showReports: Boolean = false,
+    onShowReportsChange: (Boolean) -> Unit = {},
+    onCompanyClick: (Int) -> Unit = {}
+) {
     val colorScheme = MaterialTheme.colorScheme
 
     Box(
@@ -58,12 +63,13 @@ fun ProfileScreen() {
             .background(colorScheme.background)
     ) {
         if (AuthManager.isLoggedIn) {
-            var showReports by remember { mutableStateOf(false) }
-
             if (showReports) {
-                MyReportsScreen(onBack = { showReports = false })
+                MyReportsScreen(
+                    onBack = { onShowReportsChange(false) },
+                    onCompanyClick = onCompanyClick
+                )
             } else {
-                LoggedInProfile(onShowReports = { showReports = true })
+                LoggedInProfile(onShowReports = { onShowReportsChange(true) })
             }
         } else {
             SignInScreen()
@@ -152,7 +158,7 @@ private fun LoggedInProfile(onShowReports: () -> Unit) {
 }
 
 @Composable
-private fun MyReportsScreen(onBack: () -> Unit) {
+private fun MyReportsScreen(onBack: () -> Unit, onCompanyClick: (Int) -> Unit) {
     val colorScheme = MaterialTheme.colorScheme
     var profile by remember { mutableStateOf<UserProfile?>(null) }
 
@@ -208,6 +214,7 @@ private fun MyReportsScreen(onBack: () -> Unit) {
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
                             .background(colorScheme.surfaceContainerHigh)
+                            .clickable { onCompanyClick(report.companyId) }
                             .padding(16.dp)
                     ) {
                         Row(
@@ -297,7 +304,7 @@ private fun SignInScreen() {
                         val idToken = googleIdToken.idToken
 
                         val response = ApiClient.api.authGoogle(GoogleAuthRequest(token = idToken))
-                        AuthManager.login(response.accessToken, response.userId, response.username, activity)
+                        AuthManager.login(response.accessToken, response.refreshToken, response.userId, response.username, activity)
                     } catch (e: Exception) {
                         Log.e("ErthiScan", "Sign in failed", e)
                     }

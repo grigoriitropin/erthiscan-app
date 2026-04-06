@@ -118,32 +118,17 @@ fun CompanyPage(companyId: Int, onBack: () -> Unit) {
             .background(colorScheme.background)
             .systemBarsPadding()
     ) {
-        Row(
+        Text(
+            text = data.name,
+            color = colorScheme.onBackground,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "←",
-                color = colorScheme.onBackground,
-                fontSize = 24.sp,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onBack() }
-                    .padding(8.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = data.name,
-                color = colorScheme.onBackground,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-        }
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        )
 
         LazyColumn(
             modifier = Modifier

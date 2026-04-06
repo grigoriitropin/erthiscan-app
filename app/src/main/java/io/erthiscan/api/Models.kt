@@ -38,8 +38,20 @@ data class GoogleAuthRequest(
 @Serializable
 data class AuthResponse(
     @SerialName("access_token") val accessToken: String,
+    @SerialName("refresh_token") val refreshToken: String,
     @SerialName("user_id") val userId: Int,
     val username: String
+)
+
+@Serializable
+data class RefreshRequest(
+    @SerialName("refresh_token") val refreshToken: String
+)
+
+@Serializable
+data class RefreshResponse(
+    @SerialName("access_token") val accessToken: String,
+    @SerialName("refresh_token") val refreshToken: String
 )
 
 @Serializable
@@ -55,7 +67,8 @@ data class CompanyItem(
     val id: Int,
     val name: String,
     @SerialName("ethical_score") val ethicalScore: Float,
-    @SerialName("has_reports") val hasReports: Boolean
+    @SerialName("has_reports") val hasReports: Boolean,
+    @SerialName("report_count") val reportCount: Int = 0
 )
 
 @Serializable
