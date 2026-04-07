@@ -52,12 +52,17 @@ import androidx.compose.ui.unit.sp
 import io.erthiscan.api.ApiClient
 import io.erthiscan.api.ScanBarcodeRequest
 import io.erthiscan.api.ScanResponse
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import retrofit2.HttpException
 
 @Composable
 fun ScanScreen(onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> }) {
     var isTorchOn by remember { mutableStateOf(false) }
     var scannedBarcode by remember { mutableStateOf<String?>(null) }
     var scanResult by remember { mutableStateOf<ScanResponse?>(null) }
+    var notFoundBarcode by remember { mutableStateOf<String?>(null) }
     val vibrator = (LocalContext.current.getSystemService(VibratorManager::class.java))
         .defaultVibrator
 
@@ -141,11 +146,35 @@ fun ScanScreen(onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> }) {
             LaunchedEffect(barcode) {
                 try {
                     scanResult = ApiClient.api.scanBarcode(ScanBarcodeRequest(barcode))
+                } catch (e: HttpException) {
+                    Log.e("ErthiScan", "API error ${e.code()}", e)
+                    if (e.code() == 404) {
+                        val detail = runCatching {
+                            e.response()?.errorBody()?.string()?.let {
+                                kotlinx.serialization.json.Json.parseToJsonElement(it)
+                                    .jsonObject["detail"]?.jsonPrimitive?.contentOrNull
+                            }
+                        }.getOrNull()
+                        if (detail == "product not found") {
+                            notFoundBarcode = barcode
+                        }
+                    }
+                    scanResult = null
                 } catch (e: Exception) {
                     Log.e("ErthiScan", "API error", e)
                     scanResult = null
                 }
             }
+        }
+
+        notFoundBarcode?.let { barcode ->
+            ProductNotFoundSheet(
+                barcode = barcode,
+                onDismiss = {
+                    notFoundBarcode = null
+                    scannedBarcode = null
+                }
+            )
         }
 
         scanResult?.let { result ->
