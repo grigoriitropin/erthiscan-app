@@ -25,6 +25,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,13 +48,20 @@ import io.erthiscan.api.ApiClient
 import io.erthiscan.api.GoogleAuthRequest
 import io.erthiscan.api.UserProfile
 import io.erthiscan.auth.AuthManager
+import io.erthiscan.company.page.ConfirmDeleteDialog
+import io.erthiscan.company.page.CreateReportScreen
+import io.erthiscan.company.page.DeleteChip
+import io.erthiscan.company.page.EditChip
 import kotlinx.coroutines.launch
+
+enum class ProfileSubScreen { ROOT, REPORTS, CHALLENGES }
 
 @Composable
 fun ProfileScreen(
-    showReports: Boolean = false,
-    onShowReportsChange: (Boolean) -> Unit = {},
-    onCompanyClick: (Int) -> Unit = {}
+    subScreen: ProfileSubScreen = ProfileSubScreen.ROOT,
+    onSubScreenChange: (ProfileSubScreen) -> Unit = {},
+    onFullscreenChange: (Boolean) -> Unit = {},
+    onCompanyClick: (Int, Int) -> Unit = { _, _ -> }
 ) {
     val colorScheme = MaterialTheme.colorScheme
 
@@ -63,13 +71,21 @@ fun ProfileScreen(
             .background(colorScheme.background)
     ) {
         if (AuthManager.isLoggedIn) {
-            if (showReports) {
-                MyReportsScreen(
-                    onBack = { onShowReportsChange(false) },
+            when (subScreen) {
+                ProfileSubScreen.REPORTS -> MyReportsScreen(
+                    onBack = { onSubScreenChange(ProfileSubScreen.ROOT) },
+                    onFullscreenChange = onFullscreenChange,
                     onCompanyClick = onCompanyClick
                 )
-            } else {
-                LoggedInProfile(onShowReports = { onShowReportsChange(true) })
+                ProfileSubScreen.CHALLENGES -> MyChallengesScreen(
+                    onBack = { onSubScreenChange(ProfileSubScreen.ROOT) },
+                    onFullscreenChange = onFullscreenChange,
+                    onCompanyClick = onCompanyClick
+                )
+                ProfileSubScreen.ROOT -> LoggedInProfile(
+                    onShowReports = { onSubScreenChange(ProfileSubScreen.REPORTS) },
+                    onShowChallenges = { onSubScreenChange(ProfileSubScreen.CHALLENGES) }
+                )
             }
         } else {
             SignInScreen()
@@ -78,7 +94,7 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun LoggedInProfile(onShowReports: () -> Unit) {
+private fun LoggedInProfile(onShowReports: () -> Unit, onShowChallenges: () -> Unit) {
     val colorScheme = MaterialTheme.colorScheme
     val activity = LocalContext.current as ComponentActivity
     val scope = activity.lifecycleScope
@@ -111,7 +127,7 @@ private fun LoggedInProfile(onShowReports: () -> Unit) {
         if (profile != null) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "${profile!!.reportCount} reports",
+                text = "${profile!!.reportCount} reports · ${profile!!.challengeCount} challenges",
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
@@ -130,6 +146,24 @@ private fun LoggedInProfile(onShowReports: () -> Unit) {
         ) {
             Text(
                 text = "My Reports",
+                fontSize = 16.sp,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = onShowChallenges,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colorScheme.primaryContainer,
+                contentColor = colorScheme.onPrimaryContainer
+            )
+        ) {
+            Text(
+                text = "My Challenges",
                 fontSize = 16.sp,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
@@ -158,16 +192,68 @@ private fun LoggedInProfile(onShowReports: () -> Unit) {
 }
 
 @Composable
-private fun MyReportsScreen(onBack: () -> Unit, onCompanyClick: (Int) -> Unit) {
+private fun MyReportsScreen(
+    onBack: () -> Unit,
+    onFullscreenChange: (Boolean) -> Unit,
+    onCompanyClick: (Int, Int) -> Unit
+) {
     val colorScheme = MaterialTheme.colorScheme
+    val activity = LocalContext.current as ComponentActivity
+    val scope = activity.lifecycleScope
     var profile by remember { mutableStateOf<UserProfile?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
+    var editingReport by remember { mutableStateOf<io.erthiscan.api.UserReportItem?>(null) }
+    var deletingReport by remember { mutableStateOf<io.erthiscan.api.UserReportItem?>(null) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(editingReport) {
+        onFullscreenChange(editingReport != null)
+    }
+    DisposableEffect(Unit) {
+        onDispose { onFullscreenChange(false) }
+    }
+
+    LaunchedEffect(refreshKey) {
         try {
             profile = ApiClient.api.getMyProfile()
         } catch (e: Exception) {
             Log.e("ErthiScan", "Failed to load reports", e)
         }
+    }
+
+    if (editingReport != null) {
+        val r = editingReport!!
+        CreateReportScreen(
+            companyId = r.companyId,
+            companyName = r.companyName,
+            editReportId = r.id,
+            initialText = r.text,
+            initialSource = r.sources.firstOrNull() ?: "",
+            onBack = { editingReport = null },
+            onSubmitted = {
+                editingReport = null
+                refreshKey++
+            }
+        )
+        return
+    }
+
+    if (deletingReport != null) {
+        ConfirmDeleteDialog(
+            text = "Delete this report? Its challenges will also be removed.",
+            onConfirm = {
+                val r = deletingReport!!
+                deletingReport = null
+                scope.launch {
+                    try {
+                        ApiClient.api.deleteReport(r.id)
+                        refreshKey++
+                    } catch (e: Exception) {
+                        Log.e("ErthiScan", "Failed to delete report", e)
+                    }
+                }
+            },
+            onDismiss = { deletingReport = null }
+        )
     }
 
     BackHandler { onBack() }
@@ -214,7 +300,7 @@ private fun MyReportsScreen(onBack: () -> Unit, onCompanyClick: (Int) -> Unit) {
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
                             .background(colorScheme.surfaceContainerHigh)
-                            .clickable { onCompanyClick(report.companyId) }
+                            .clickable { onCompanyClick(report.companyId, report.id) }
                             .padding(16.dp)
                     ) {
                         Row(
@@ -248,6 +334,172 @@ private fun MyReportsScreen(onBack: () -> Unit, onCompanyClick: (Int) -> Unit) {
                             color = colorScheme.onSurface,
                             fontSize = 14.sp
                         )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            EditChip(onClick = { editingReport = report })
+                            DeleteChip(onClick = { deletingReport = report })
+                        }
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(80.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MyChallengesScreen(
+    onBack: () -> Unit,
+    onFullscreenChange: (Boolean) -> Unit,
+    onCompanyClick: (Int, Int) -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val activity = LocalContext.current as ComponentActivity
+    val scope = activity.lifecycleScope
+    var profile by remember { mutableStateOf<UserProfile?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
+    var editingChallenge by remember { mutableStateOf<io.erthiscan.api.UserChallengeItem?>(null) }
+    var deletingChallenge by remember { mutableStateOf<io.erthiscan.api.UserChallengeItem?>(null) }
+
+    LaunchedEffect(editingChallenge) {
+        onFullscreenChange(editingChallenge != null)
+    }
+    DisposableEffect(Unit) {
+        onDispose { onFullscreenChange(false) }
+    }
+
+    LaunchedEffect(refreshKey) {
+        try {
+            profile = ApiClient.api.getMyProfile()
+        } catch (e: Exception) {
+            Log.e("ErthiScan", "Failed to load challenges", e)
+        }
+    }
+
+    if (editingChallenge != null) {
+        val c = editingChallenge!!
+        CreateReportScreen(
+            companyId = c.companyId,
+            companyName = c.companyName,
+            editReportId = c.id,
+            initialText = c.text,
+            initialSource = c.sources.firstOrNull() ?: "",
+            onBack = { editingChallenge = null },
+            onSubmitted = {
+                editingChallenge = null
+                refreshKey++
+            }
+        )
+        return
+    }
+
+    if (deletingChallenge != null) {
+        ConfirmDeleteDialog(
+            text = "Delete this challenge?",
+            onConfirm = {
+                val c = deletingChallenge!!
+                deletingChallenge = null
+                scope.launch {
+                    try {
+                        ApiClient.api.deleteReport(c.id)
+                        refreshKey++
+                    } catch (e: Exception) {
+                        Log.e("ErthiScan", "Failed to delete challenge", e)
+                    }
+                }
+            },
+            onDismiss = { deletingChallenge = null }
+        )
+    }
+
+    BackHandler { onBack() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colorScheme.background)
+            .systemBarsPadding()
+    ) {
+        Text(
+            text = "My Challenges",
+            color = colorScheme.onBackground,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        )
+
+        if (profile == null) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Loading...", color = colorScheme.onSurfaceVariant)
+            }
+        } else if (profile!!.challenges.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No challenges yet", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(profile!!.challenges, key = { it.id }) { challenge ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(colorScheme.surfaceContainerHigh)
+                            .clickable { onCompanyClick(challenge.companyId, challenge.parentId) }
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = challenge.companyName,
+                                color = colorScheme.primary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            val voteColor = when {
+                                challenge.voteSum > 0 -> Color(0xFF43A047)
+                                challenge.voteSum < 0 -> Color(0xFFE53935)
+                                else -> colorScheme.onSurfaceVariant
+                            }
+                            Text(
+                                text = if (challenge.voteSum > 0) "+${challenge.voteSum}" else challenge.voteSum.toString(),
+                                color = voteColor,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = challenge.text,
+                            color = colorScheme.onSurface,
+                            fontSize = 14.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            EditChip(onClick = { editingChallenge = challenge })
+                            DeleteChip(onClick = { deletingChallenge = challenge })
+                        }
                     }
                 }
 

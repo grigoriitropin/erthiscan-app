@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.erthiscan.api.ApiClient
 import io.erthiscan.api.CreateReportRequest
+import io.erthiscan.api.UpdateReportRequest
 import kotlinx.coroutines.launch
 
 @Composable
@@ -45,18 +46,25 @@ fun CreateReportScreen(
     companyId: Int,
     companyName: String,
     parentId: Int? = null,
+    editReportId: Int? = null,
+    initialText: String = "",
+    initialSource: String = "",
     onBack: () -> Unit,
     onSubmitted: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val activity = LocalContext.current as ComponentActivity
     val scope = activity.lifecycleScope
-    var text by remember { mutableStateOf("") }
-    var sourceUrl by remember { mutableStateOf("") }
+    var text by remember { mutableStateOf(initialText) }
+    var sourceUrl by remember { mutableStateOf(initialSource) }
     var submitting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val title = if (parentId != null) "Challenge Report" else "Add Report"
+    val title = when {
+        editReportId != null -> "Edit Report"
+        parentId != null -> "Challenge Report"
+        else -> "Add Report"
+    }
 
     BackHandler { onBack() }
 
@@ -182,17 +190,27 @@ fun CreateReportScreen(
                     error = null
                     scope.launch {
                         try {
-                            ApiClient.api.createReport(
-                                CreateReportRequest(
-                                    companyId = companyId,
-                                    text = text.trim(),
-                                    sources = listOf(sourceUrl.trim()),
-                                    parentId = parentId
+                            if (editReportId != null) {
+                                ApiClient.api.updateReport(
+                                    editReportId,
+                                    UpdateReportRequest(
+                                        text = text.trim(),
+                                        sources = listOf(sourceUrl.trim())
+                                    )
                                 )
-                            )
+                            } else {
+                                ApiClient.api.createReport(
+                                    CreateReportRequest(
+                                        companyId = companyId,
+                                        text = text.trim(),
+                                        sources = listOf(sourceUrl.trim()),
+                                        parentId = parentId
+                                    )
+                                )
+                            }
                             onSubmitted()
                         } catch (e: Exception) {
-                            Log.e("ErthiScan", "Failed to create report", e)
+                            Log.e("ErthiScan", "Failed to submit report", e)
                             error = "Failed to submit report"
                             submitting = false
                         }

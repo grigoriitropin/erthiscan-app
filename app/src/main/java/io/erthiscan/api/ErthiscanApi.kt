@@ -1,7 +1,9 @@
 package io.erthiscan.api
 
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -33,6 +35,12 @@ interface ErthiscanApi {
 
     @POST("reports")
     suspend fun createReport(@Body request: CreateReportRequest): Unit
+
+    @PATCH("reports/{id}")
+    suspend fun updateReport(@Path("id") reportId: Int, @Body request: UpdateReportRequest): Unit
+
+    @DELETE("reports/{id}")
+    suspend fun deleteReport(@Path("id") reportId: Int): Unit
 
     @POST("reports/{id}/vote")
     suspend fun vote(@Path("id") reportId: Int, @Body request: VoteRequest): VoteResponse

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,21 +53,42 @@ import io.erthiscan.auth.AuthManager
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-enum class CompanyPageScreen { DETAIL, CREATE_REPORT, CREATE_CHALLENGE }
+enum class CompanyPageScreen { DETAIL, CREATE_REPORT, CREATE_CHALLENGE, EDIT_REPORT }
 
 @Composable
-fun CompanyPage(companyId: Int, onBack: () -> Unit) {
+fun CompanyPage(companyId: Int, onBack: () -> Unit, scrollToReportId: Int? = null) {
     val colorScheme = MaterialTheme.colorScheme
     var company by remember { mutableStateOf<CompanyDetail?>(null) }
     var screen by remember { mutableStateOf(CompanyPageScreen.DETAIL) }
     var challengeParentId by remember { mutableStateOf<Int?>(null) }
+    var editReportId by remember { mutableStateOf<Int?>(null) }
+    var editInitialText by remember { mutableStateOf("") }
+    var editInitialSource by remember { mutableStateOf("") }
     var refreshKey by remember { mutableIntStateOf(0) }
+    val listState = rememberLazyListState()
+    var scrolledToTarget by remember { mutableStateOf(false) }
+    val activity = LocalContext.current as ComponentActivity
+    val scope = activity.lifecycleScope
 
     LaunchedEffect(companyId, refreshKey) {
         try {
             company = ApiClient.api.getCompany(companyId)
         } catch (e: Exception) {
             Log.e("ErthiScan", "Failed to load company", e)
+        }
+    }
+
+    // Scroll to the requested report once after data loads
+    LaunchedEffect(company, scrollToReportId) {
+        if (!scrolledToTarget && scrollToReportId != null && company != null) {
+            val reportIndex = company!!.reports.indexOfFirst { it.id == scrollToReportId }
+            if (reportIndex >= 0) {
+                // Header items before reports list:
+                // ScoreCard (1) + Add Report button if logged in (1) + "Reports" title (1)
+                val headerCount = 2 + (if (AuthManager.isLoggedIn) 1 else 0)
+                listState.scrollToItem(headerCount + reportIndex)
+                scrolledToTarget = true
+            }
         }
     }
 
@@ -88,6 +110,21 @@ fun CompanyPage(companyId: Int, onBack: () -> Unit) {
                 companyId = companyId,
                 companyName = company?.name ?: "",
                 parentId = challengeParentId,
+                onBack = { screen = CompanyPageScreen.DETAIL },
+                onSubmitted = {
+                    screen = CompanyPageScreen.DETAIL
+                    refreshKey++
+                }
+            )
+            return
+        }
+        CompanyPageScreen.EDIT_REPORT -> {
+            CreateReportScreen(
+                companyId = companyId,
+                companyName = company?.name ?: "",
+                editReportId = editReportId,
+                initialText = editInitialText,
+                initialSource = editInitialSource,
                 onBack = { screen = CompanyPageScreen.DETAIL },
                 onSubmitted = {
                     screen = CompanyPageScreen.DETAIL
@@ -131,6 +168,7 @@ fun CompanyPage(companyId: Int, onBack: () -> Unit) {
         )
 
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -196,7 +234,39 @@ fun CompanyPage(companyId: Int, onBack: () -> Unit) {
                             challengeParentId = report.id
                             screen = CompanyPageScreen.CREATE_CHALLENGE
                         },
-                        onVoteUpdated = { refreshKey++ }
+                        onVoteUpdated = { refreshKey++ },
+                        onEdit = {
+                            editReportId = report.id
+                            editInitialText = report.text
+                            editInitialSource = report.sources.firstOrNull() ?: ""
+                            screen = CompanyPageScreen.EDIT_REPORT
+                        },
+                        onDelete = {
+                            scope.launch {
+                                try {
+                                    ApiClient.api.deleteReport(report.id)
+                                    refreshKey++
+                                } catch (e: Exception) {
+                                    Log.e("ErthiScan", "Failed to delete report", e)
+                                }
+                            }
+                        },
+                        onSubEdit = { sub ->
+                            editReportId = sub.id
+                            editInitialText = sub.text
+                            editInitialSource = sub.sources.firstOrNull() ?: ""
+                            screen = CompanyPageScreen.EDIT_REPORT
+                        },
+                        onSubDelete = { sub ->
+                            scope.launch {
+                                try {
+                                    ApiClient.api.deleteReport(sub.id)
+                                    refreshKey++
+                                } catch (e: Exception) {
+                                    Log.e("ErthiScan", "Failed to delete challenge", e)
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -259,7 +329,11 @@ private fun ScoreCard(ethicalScore: Float, reportCount: Int) {
 private fun ReportCardWithSubs(
     report: ReportItem,
     onChallenge: () -> Unit,
-    onVoteUpdated: () -> Unit
+    onVoteUpdated: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onSubEdit: (SubReportItem) -> Unit,
+    onSubDelete: (SubReportItem) -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val activity = LocalContext.current as ComponentActivity
@@ -269,6 +343,19 @@ private fun ReportCardWithSubs(
     var unethicalCount by remember(report.id) { mutableIntStateOf(report.unethicalCount) }
     var userVote by remember(report.id) { mutableStateOf(report.userVote) }
     var expanded by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    val isMine = AuthManager.isLoggedIn && AuthManager.userId == report.userId
+
+    if (showDeleteDialog) {
+        ConfirmDeleteDialog(
+            text = "Delete this report? Its challenges will also be removed.",
+            onConfirm = {
+                showDeleteDialog = false
+                onDelete()
+            },
+            onDismiss = { showDeleteDialog = false }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -287,6 +374,12 @@ private fun ReportCardWithSubs(
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
+            if (isMine) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    EditChip(onClick = onEdit)
+                    DeleteChip(onClick = { showDeleteDialog = true })
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -407,7 +500,11 @@ private fun ReportCardWithSubs(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Spacer(modifier = Modifier.height(4.dp))
                     report.subReports.forEach { sub ->
-                        SubReportCard(sub)
+                        SubReportCard(
+                            sub = sub,
+                            onEdit = { onSubEdit(sub) },
+                            onDelete = { onSubDelete(sub) }
+                        )
                     }
                 }
             }
@@ -416,7 +513,11 @@ private fun ReportCardWithSubs(
 }
 
 @Composable
-private fun SubReportCard(sub: SubReportItem) {
+private fun SubReportCard(
+    sub: SubReportItem,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     val colorScheme = MaterialTheme.colorScheme
     val activity = LocalContext.current as ComponentActivity
     val scope = activity.lifecycleScope
@@ -424,6 +525,19 @@ private fun SubReportCard(sub: SubReportItem) {
     var trueCount by remember(sub.id) { mutableIntStateOf(sub.trueCount) }
     var falseCount by remember(sub.id) { mutableIntStateOf(sub.falseCount) }
     var userVote by remember(sub.id) { mutableStateOf(sub.userVote) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    val isMine = AuthManager.isLoggedIn && AuthManager.userId == sub.userId
+
+    if (showDeleteDialog) {
+        ConfirmDeleteDialog(
+            text = "Delete this challenge?",
+            onConfirm = {
+                showDeleteDialog = false
+                onDelete()
+            },
+            onDismiss = { showDeleteDialog = false }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -432,11 +546,23 @@ private fun SubReportCard(sub: SubReportItem) {
             .background(colorScheme.surfaceContainerHighest)
             .padding(12.dp)
     ) {
-        Text(
-            text = sub.author,
-            color = colorScheme.onSurfaceVariant,
-            fontSize = 11.sp
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = sub.author,
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 11.sp
+            )
+            if (isMine) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    EditChip(onClick = onEdit)
+                    DeleteChip(onClick = { showDeleteDialog = true })
+                }
+            }
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = sub.text,
@@ -533,4 +659,59 @@ private fun VoteChip(
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )
     }
+}
+
+@Composable
+internal fun EditChip(onClick: () -> Unit) {
+    val colorScheme = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(colorScheme.surfaceContainerHighest)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = "Edit",
+            color = colorScheme.onSurfaceVariant,
+            fontSize = 11.sp
+        )
+    }
+}
+
+@Composable
+internal fun DeleteChip(onClick: () -> Unit) {
+    val colorScheme = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(colorScheme.errorContainer)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = "Delete",
+            color = colorScheme.onErrorContainer,
+            fontSize = 11.sp
+        )
+    }
+}
+
+@Composable
+internal fun ConfirmDeleteDialog(text: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete") },
+        text = { Text(text) },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onConfirm) {
+                Text("Delete", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
