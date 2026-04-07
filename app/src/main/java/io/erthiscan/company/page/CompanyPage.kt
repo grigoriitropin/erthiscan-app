@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -66,7 +68,7 @@ fun CompanyPage(companyId: Int, onBack: () -> Unit, scrollToReportId: Int? = nul
     var editInitialSource by remember { mutableStateOf("") }
     var refreshKey by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
-    var scrolledToTarget by remember { mutableStateOf(false) }
+    var pendingScrollId by remember { mutableStateOf(scrollToReportId) }
     val activity = LocalContext.current as ComponentActivity
     val scope = activity.lifecycleScope
 
@@ -79,16 +81,16 @@ fun CompanyPage(companyId: Int, onBack: () -> Unit, scrollToReportId: Int? = nul
     }
 
     // Scroll to the requested report once after data loads
-    LaunchedEffect(company, scrollToReportId) {
-        if (!scrolledToTarget && scrollToReportId != null && company != null) {
-            val reportIndex = company!!.reports.indexOfFirst { it.id == scrollToReportId }
-            if (reportIndex >= 0) {
-                // Header items before reports list:
-                // ScoreCard (1) + Add Report button if logged in (1) + "Reports" title (1)
-                val headerCount = 2 + (if (AuthManager.isLoggedIn) 1 else 0)
-                listState.scrollToItem(headerCount + reportIndex)
-                scrolledToTarget = true
-            }
+    LaunchedEffect(company, pendingScrollId) {
+        val target = pendingScrollId ?: return@LaunchedEffect
+        val loaded = company ?: return@LaunchedEffect
+        val reportIndex = loaded.reports.indexOfFirst { it.id == target }
+        if (reportIndex >= 0) {
+            // Header items before reports list:
+            // ScoreCard (1) + Add Report button if logged in (1) + "Reports" title (1)
+            val headerCount = 2 + (if (AuthManager.isLoggedIn) 1 else 0)
+            listState.scrollToItem(headerCount + reportIndex)
+            pendingScrollId = null
         }
     }
 
@@ -112,6 +114,7 @@ fun CompanyPage(companyId: Int, onBack: () -> Unit, scrollToReportId: Int? = nul
                 parentId = challengeParentId,
                 onBack = { screen = CompanyPageScreen.DETAIL },
                 onSubmitted = {
+                    pendingScrollId = challengeParentId
                     screen = CompanyPageScreen.DETAIL
                     refreshKey++
                 }
@@ -346,6 +349,10 @@ private fun ReportCardWithSubs(
     var showDeleteDialog by remember { mutableStateOf(false) }
     val isMine = AuthManager.isLoggedIn && AuthManager.userId == report.userId
 
+    val voteSum = ethicalCount - unethicalCount
+    val challengePenalty = report.subReports.sumOf { maxOf(0, it.trueCount - it.falseCount) }
+    val isDisputed = voteSum > 0 && challengePenalty >= 0.7 * voteSum
+
     if (showDeleteDialog) {
         ConfirmDeleteDialog(
             text = "Delete this report? Its challenges will also be removed.",
@@ -357,23 +364,46 @@ private fun ReportCardWithSubs(
         )
     }
 
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(IntrinsicSize.Min)
             .clip(RoundedCornerShape(16.dp))
             .background(colorScheme.surfaceContainerHigh)
+    ) {
+        if (isDisputed) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(Color(0xFFE53935))
+            )
+        }
+    Column(
+        modifier = Modifier
+            .weight(1f)
             .padding(16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = report.author,
-                color = colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = report.author,
+                    color = colorScheme.onSurface,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = report.createdAt.take(10),
+                    color = colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            }
             if (isMine) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     EditChip(onClick = onEdit)
@@ -509,6 +539,7 @@ private fun ReportCardWithSubs(
                 }
             }
         }
+    }
     }
 }
 
