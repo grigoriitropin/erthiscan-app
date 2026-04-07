@@ -20,6 +20,7 @@ import io.erthiscan.api.ScanResponse
 import io.erthiscan.company.CompaniesScreen
 import io.erthiscan.company.page.CompanyPage
 import io.erthiscan.profile.ProfileScreen
+import io.erthiscan.profile.ProfileSubScreen
 import io.erthiscan.scan.ProductSheet
 import io.erthiscan.scan.ScanScreen
 import io.erthiscan.scan.TabBar
@@ -30,20 +31,27 @@ enum class CompanySource { LIST, SCAN, PROFILE }
 fun MainScreen() {
     var selectedTab by remember { mutableIntStateOf(1) }
     var openCompanyId by remember { mutableStateOf<Int?>(null) }
+    var openScrollToReportId by remember { mutableStateOf<Int?>(null) }
     var companySource by remember { mutableStateOf(CompanySource.LIST) }
     var savedScanResult by remember { mutableStateOf<ScanResponse?>(null) }
-    var profileShowReports by remember { mutableStateOf(false) }
+    var profileSubScreen by remember { mutableStateOf(ProfileSubScreen.ROOT) }
+    var profileFullscreen by remember { mutableStateOf(false) }
     val vibrator = (LocalContext.current.getSystemService(VibratorManager::class.java))
         .defaultVibrator
 
     BackHandler(enabled = openCompanyId != null) {
         openCompanyId = null
+        openScrollToReportId = null
     }
 
     if (openCompanyId != null) {
         CompanyPage(
             companyId = openCompanyId!!,
-            onBack = { openCompanyId = null }
+            onBack = {
+                openCompanyId = null
+                openScrollToReportId = null
+            },
+            scrollToReportId = openScrollToReportId
         )
         return
     }
@@ -79,16 +87,18 @@ fun MainScreen() {
                 openCompanyId = companyId
             })
             2 -> ProfileScreen(
-                showReports = profileShowReports,
-                onShowReportsChange = { profileShowReports = it },
-                onCompanyClick = {
+                subScreen = profileSubScreen,
+                onSubScreenChange = { profileSubScreen = it },
+                onFullscreenChange = { profileFullscreen = it },
+                onCompanyClick = { companyId, reportId ->
                     companySource = CompanySource.PROFILE
-                    openCompanyId = it
+                    openScrollToReportId = reportId
+                    openCompanyId = companyId
                 }
             )
         }
 
-        Box(
+        if (!profileFullscreen) Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
@@ -97,6 +107,10 @@ fun MainScreen() {
         ) {
             TabBar(selectedTab = selectedTab, onTabSelected = {
                 vibrator.vibrate(VibrationEffect.createOneShot(30, 50))
+                if (selectedTab == 2 && it != 2) {
+                    profileSubScreen = ProfileSubScreen.ROOT
+                    profileFullscreen = false
+                }
                 selectedTab = it
             })
         }

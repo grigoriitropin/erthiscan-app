@@ -83,6 +83,7 @@ data class CompanyDetail(
 @Serializable
 data class SubReportItem(
     val id: Int,
+    @SerialName("user_id") val userId: Int = 0,
     val text: String,
     val sources: List<String>,
     val author: String,
@@ -95,6 +96,7 @@ data class SubReportItem(
 @Serializable
 data class ReportItem(
     val id: Int,
+    @SerialName("user_id") val userId: Int = 0,
     val text: String,
     val sources: List<String>,
     val author: String,
@@ -114,6 +116,12 @@ data class CreateReportRequest(
 )
 
 @Serializable
+data class UpdateReportRequest(
+    val text: String,
+    val sources: List<String>
+)
+
+@Serializable
 data class VoteRequest(val value: Int)
 
 @Serializable
@@ -129,6 +137,19 @@ data class UserReportItem(
     @SerialName("company_id") val companyId: Int,
     @SerialName("company_name") val companyName: String,
     val text: String,
+    val sources: List<String> = emptyList(),
+    @SerialName("vote_sum") val voteSum: Int,
+    @SerialName("created_at") val createdAt: String
+)
+
+@Serializable
+data class UserChallengeItem(
+    val id: Int,
+    @SerialName("parent_id") val parentId: Int,
+    @SerialName("company_id") val companyId: Int,
+    @SerialName("company_name") val companyName: String,
+    val text: String,
+    val sources: List<String> = emptyList(),
     @SerialName("vote_sum") val voteSum: Int,
     @SerialName("created_at") val createdAt: String
 )
@@ -138,5 +159,7 @@ data class UserProfile(
     @SerialName("user_id") val userId: Int,
     val username: String,
     @SerialName("report_count") val reportCount: Int,
-    val reports: List<UserReportItem>
+    @SerialName("challenge_count") val challengeCount: Int = 0,
+    val reports: List<UserReportItem>,
+    val challenges: List<UserChallengeItem> = emptyList()
 )
