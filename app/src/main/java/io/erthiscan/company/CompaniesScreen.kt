@@ -151,65 +151,80 @@ fun CompaniesScreen(onCompanyClick: (Int) -> Unit = {}) {
             ) {
                 Text("Loading...", color = colorScheme.onSurfaceVariant)
             }
-        } else LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(companies, key = { it.id }) { company ->
-                CompanyRow(company, onClick = { onCompanyClick(company.id) })
+        } else if (!loading && companies.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No companies found",
+                    color = colorScheme.onSurfaceVariant,
+                    fontSize = 16.sp
+                )
             }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(companies, key = { it.id }) { company ->
+                    CompanyRow(company, onClick = { onCompanyClick(company.id) })
+                }
 
-            if (totalPages > 1) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (currentPage > 1) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(colorScheme.surfaceContainerHigh)
-                                    .clickable { currentPage-- }
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                            ) {
-                                Text("←", color = colorScheme.onSurface, fontSize = 16.sp)
+                if (totalPages > 1) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (currentPage > 1) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(colorScheme.surfaceContainerHigh)
+                                        .clickable { currentPage-- }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text("←", color = colorScheme.onSurface, fontSize = 16.sp)
+                                }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
 
-                        Text(
-                            text = "$currentPage / $totalPages",
-                            color = colorScheme.onSurfaceVariant,
-                            fontSize = 14.sp
-                        )
+                            Text(
+                                text = "$currentPage / $totalPages",
+                                color = colorScheme.onSurfaceVariant,
+                                fontSize = 14.sp
+                            )
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
 
-                        if (currentPage < totalPages) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(colorScheme.surfaceContainerHigh)
-                                    .clickable { currentPage++ }
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                            ) {
-                                Text("→", color = colorScheme.onSurface, fontSize = 16.sp)
+                            if (currentPage < totalPages) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(colorScheme.surfaceContainerHigh)
+                                        .clickable { currentPage++ }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text("→", color = colorScheme.onSurface, fontSize = 16.sp)
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+                item { Spacer(modifier = Modifier.height(80.dp)) }
+            }
         }
     }
 }
