@@ -1,11 +1,14 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     kotlin("plugin.serialization") version "2.1.20"
 }
 
-val localProps = java.util.Properties().apply {
-    rootProject.file("local.properties").inputStream().use { load(it) }
+val localProps = Properties().apply {
+    load(FileInputStream(rootProject.file("local.properties")))
 }
 
 android {
