@@ -12,6 +12,8 @@
 /.idea/vcs.xml
 /.idea/deploymentTargetSelector.xml
 /.idea/inspectionProfiles
+/.idea/.name
+/.idea/codeStyles/
 .DS_Store
 /build
 /captures
