@@ -1,133 +1,124 @@
 package io.erthiscan.profile
 
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.lifecycle.lifecycleScope
+import androidx.activity.compose.LocalActivity
+import io.erthiscan.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.NoCredentialException
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import io.erthiscan.BuildConfig
-import io.erthiscan.api.ApiClient
-import io.erthiscan.api.GoogleAuthRequest
-import io.erthiscan.api.UserProfile
-import io.erthiscan.auth.AuthManager
 import io.erthiscan.company.page.ConfirmDeleteDialog
-import io.erthiscan.company.page.CreateReportScreen
 import io.erthiscan.company.page.DeleteChip
 import io.erthiscan.company.page.EditChip
-import kotlinx.coroutines.launch
-
-enum class ProfileSubScreen { ROOT, REPORTS, CHALLENGES }
 
 @Composable
 fun ProfileScreen(
-    subScreen: ProfileSubScreen = ProfileSubScreen.ROOT,
-    onSubScreenChange: (ProfileSubScreen) -> Unit = {},
-    onFullscreenChange: (Boolean) -> Unit = {},
-    onCompanyClick: (Int, Int) -> Unit = { _, _ -> }
+    onShowReports: () -> Unit,
+    onShowChallenges: () -> Unit,
+    onCompanyClick: (Int, Int) -> Unit,
+    modifier: Modifier = Modifier,
+    vm: ProfileViewModel = hiltViewModel()
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colorScheme.background)
-    ) {
-        if (AuthManager.isLoggedIn) {
-            when (subScreen) {
-                ProfileSubScreen.REPORTS -> MyReportsScreen(
-                    onBack = { onSubScreenChange(ProfileSubScreen.ROOT) },
-                    onFullscreenChange = onFullscreenChange,
-                    onCompanyClick = onCompanyClick
+    LaunchedEffect(Unit) {
+        if (ui.auth.isLoggedIn) vm.refresh()
+    }
+
+    LaunchedEffect(ui.error) {
+        ui.error?.let {
+            snackbarHostState.showSnackbar(it.asString(context))
+            vm.dismissError()
+        }
+    }
+
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colorScheme.background)
+                .padding(
+                    top = padding.calculateTopPadding(),
+                    start = padding.calculateStartPadding(LocalLayoutDirection.current),
+                    end = padding.calculateEndPadding(LocalLayoutDirection.current),
+                    bottom = padding.calculateBottomPadding()
                 )
-                ProfileSubScreen.CHALLENGES -> MyChallengesScreen(
-                    onBack = { onSubScreenChange(ProfileSubScreen.ROOT) },
-                    onFullscreenChange = onFullscreenChange,
-                    onCompanyClick = onCompanyClick
+                .consumeWindowInsets(padding)
+        ) {
+            if (ui.auth.isLoggedIn) {
+                LoggedInProfile(
+                    onShowReports = onShowReports,
+                    onShowChallenges = onShowChallenges,
+                    onLogout = { vm.logout() },
+                    ui = ui
                 )
-                ProfileSubScreen.ROOT -> LoggedInProfile(
-                    onShowReports = { onSubScreenChange(ProfileSubScreen.REPORTS) },
-                    onShowChallenges = { onSubScreenChange(ProfileSubScreen.CHALLENGES) }
-                )
+            } else {
+                SignInScreen(onGoogleIdToken = { token -> vm.signInGoogle(token) })
             }
-        } else {
-            SignInScreen()
         }
     }
 }
 
 @Composable
-private fun LoggedInProfile(onShowReports: () -> Unit, onShowChallenges: () -> Unit) {
+private fun LoggedInProfile(
+    onShowReports: () -> Unit,
+    onShowChallenges: () -> Unit,
+    onLogout: () -> Unit,
+    ui: ProfileUiState
+) {
     val colorScheme = MaterialTheme.colorScheme
-    val activity = LocalContext.current as ComponentActivity
-    val scope = activity.lifecycleScope
-    var profile by remember { mutableStateOf<UserProfile?>(null) }
-
-    LaunchedEffect(Unit) {
-        try {
-            profile = ApiClient.api.getMyProfile()
-        } catch (e: Exception) {
-            Log.e("ErthiScan", "Failed to load profile", e)
-        }
-    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .systemBarsPadding()
             .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.weight(1f))
 
         Text(
-            text = profile?.username ?: AuthManager.username ?: "",
+            text = ui.profile?.username ?: ui.auth.username ?: "",
             color = colorScheme.onBackground,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold
         )
 
-        if (profile != null) {
+        if (ui.profile != null) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "${profile!!.reportCount} reports · ${profile!!.challengeCount} challenges",
+                text = pluralStringResource(R.plurals.reports_and_challenges, ui.profile!!.reportCount, ui.profile!!.reportCount, ui.profile!!.challengeCount),
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
@@ -145,7 +136,7 @@ private fun LoggedInProfile(onShowReports: () -> Unit, onShowChallenges: () -> U
             )
         ) {
             Text(
-                text = "My Reports",
+                text = stringResource(R.string.my_reports),
                 fontSize = 16.sp,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
@@ -163,7 +154,7 @@ private fun LoggedInProfile(onShowReports: () -> Unit, onShowChallenges: () -> U
             )
         ) {
             Text(
-                text = "My Challenges",
+                text = stringResource(R.string.my_challenges),
                 fontSize = 16.sp,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
@@ -172,7 +163,7 @@ private fun LoggedInProfile(onShowReports: () -> Unit, onShowChallenges: () -> U
         Spacer(modifier = Modifier.height(12.dp))
 
         Button(
-            onClick = { scope.launch { AuthManager.logout(activity) } },
+            onClick = onLogout,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(
@@ -181,7 +172,7 @@ private fun LoggedInProfile(onShowReports: () -> Unit, onShowChallenges: () -> U
             )
         ) {
             Text(
-                text = "Sign Out",
+                text = stringResource(R.string.sign_out),
                 fontSize = 16.sp,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
@@ -192,65 +183,25 @@ private fun LoggedInProfile(onShowReports: () -> Unit, onShowChallenges: () -> U
 }
 
 @Composable
-private fun MyReportsScreen(
+fun MyReportsScreen(
     onBack: () -> Unit,
-    onFullscreenChange: (Boolean) -> Unit,
-    onCompanyClick: (Int, Int) -> Unit
+    onCompanyClick: (Int, Int) -> Unit,
+    onEdit: (io.erthiscan.api.UserReportItem) -> Unit,
+    vm: ProfileViewModel = hiltViewModel()
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val activity = LocalContext.current as ComponentActivity
-    val scope = activity.lifecycleScope
-    var profile by remember { mutableStateOf<UserProfile?>(null) }
-    var refreshKey by remember { mutableStateOf(0) }
-    var editingReport by remember { mutableStateOf<io.erthiscan.api.UserReportItem?>(null) }
+    val ui by vm.ui.collectAsStateWithLifecycle()
     var deletingReport by remember { mutableStateOf<io.erthiscan.api.UserReportItem?>(null) }
 
-    LaunchedEffect(editingReport) {
-        onFullscreenChange(editingReport != null)
-    }
-    DisposableEffect(Unit) {
-        onDispose { onFullscreenChange(false) }
-    }
-
-    LaunchedEffect(refreshKey) {
-        try {
-            profile = ApiClient.api.getMyProfile()
-        } catch (e: Exception) {
-            Log.e("ErthiScan", "Failed to load reports", e)
-        }
-    }
-
-    if (editingReport != null) {
-        val r = editingReport!!
-        CreateReportScreen(
-            companyId = r.companyId,
-            companyName = r.companyName,
-            editReportId = r.id,
-            initialText = r.text,
-            initialSource = r.sources.firstOrNull() ?: "",
-            onBack = { editingReport = null },
-            onSubmitted = {
-                editingReport = null
-                refreshKey++
-            }
-        )
-        return
-    }
+    LaunchedEffect(Unit) { vm.refresh() }
 
     if (deletingReport != null) {
         ConfirmDeleteDialog(
-            text = "Delete this report? Its challenges will also be removed.",
+            text = stringResource(R.string.delete_report_confirmation),
             onConfirm = {
                 val r = deletingReport!!
                 deletingReport = null
-                scope.launch {
-                    try {
-                        ApiClient.api.deleteReport(r.id)
-                        refreshKey++
-                    } catch (e: Exception) {
-                        Log.e("ErthiScan", "Failed to delete report", e)
-                    }
-                }
+                vm.deleteReport(r.id)
             },
             onDismiss = { deletingReport = null }
         )
@@ -258,158 +209,124 @@ private fun MyReportsScreen(
 
     BackHandler { onBack() }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colorScheme.background)
-            .systemBarsPadding()
-    ) {
-        Text(
-            text = "My Reports",
-            color = colorScheme.onBackground,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-        )
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets.safeDrawing
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colorScheme.background)
+                .padding(padding)
+                .consumeWindowInsets(padding)
+        ) {
+            Text(
+                text = stringResource(R.string.my_reports),
+                color = colorScheme.onBackground,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            )
 
-        if (profile == null) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Loading...", color = colorScheme.onSurfaceVariant)
-            }
-        } else if (profile!!.reports.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No reports yet", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(profile!!.reports, key = { it.id }) { report ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(colorScheme.surfaceContainerHigh)
-                            .clickable { onCompanyClick(report.companyId, report.id) }
-                            .padding(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+            if (ui.loading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(stringResource(R.string.loading), color = colorScheme.onSurfaceVariant)
+                }
+            } else if (ui.profile?.reports?.isEmpty() != false) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(stringResource(R.string.no_reports_yet), color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    items(ui.profile!!.reports, key = { it.id }) { report ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(colorScheme.surfaceContainerHigh)
+                                .clickable { onCompanyClick(report.companyId, report.id) }
+                                .padding(16.dp)
                         ) {
-                            Text(
-                                text = report.companyName,
-                                color = colorScheme.primary,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            val voteColor = when {
-                                report.voteSum > 0 -> Color(0xFF43A047)
-                                report.voteSum < 0 -> Color(0xFFE53935)
-                                else -> colorScheme.onSurfaceVariant
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = report.companyName,
+                                    color = colorScheme.primary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                val voteColor = when {
+                                    report.voteSum > 0 -> Color(0xFF43A047)
+                                    report.voteSum < 0 -> Color(0xFFE53935)
+                                    else -> colorScheme.onSurfaceVariant
+                                }
+                                Text(
+                                    text = if (report.voteSum > 0) "+${report.voteSum}" else report.voteSum.toString(),
+                                    color = voteColor,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
                             Text(
-                                text = if (report.voteSum > 0) "+${report.voteSum}" else report.voteSum.toString(),
-                                color = voteColor,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
+                                text = report.text,
+                                color = colorScheme.onSurface,
+                                fontSize = 14.sp
                             )
-                        }
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                        Text(
-                            text = report.text,
-                            color = colorScheme.onSurface,
-                            fontSize = 14.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            EditChip(onClick = { editingReport = report })
-                            DeleteChip(onClick = { deletingReport = report })
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                EditChip(onClick = { onEdit(report) })
+                                DeleteChip(onClick = { deletingReport = report })
+                            }
                         }
                     }
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
                 }
-
-                item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
     }
 }
 
 @Composable
-private fun MyChallengesScreen(
+fun MyChallengesScreen(
     onBack: () -> Unit,
-    onFullscreenChange: (Boolean) -> Unit,
-    onCompanyClick: (Int, Int) -> Unit
+    onCompanyClick: (Int, Int) -> Unit,
+    onEdit: (io.erthiscan.api.UserChallengeItem) -> Unit,
+    vm: ProfileViewModel = hiltViewModel()
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val activity = LocalContext.current as ComponentActivity
-    val scope = activity.lifecycleScope
-    var profile by remember { mutableStateOf<UserProfile?>(null) }
-    var refreshKey by remember { mutableStateOf(0) }
-    var editingChallenge by remember { mutableStateOf<io.erthiscan.api.UserChallengeItem?>(null) }
+    val ui by vm.ui.collectAsStateWithLifecycle()
     var deletingChallenge by remember { mutableStateOf<io.erthiscan.api.UserChallengeItem?>(null) }
 
-    LaunchedEffect(editingChallenge) {
-        onFullscreenChange(editingChallenge != null)
-    }
-    DisposableEffect(Unit) {
-        onDispose { onFullscreenChange(false) }
-    }
-
-    LaunchedEffect(refreshKey) {
-        try {
-            profile = ApiClient.api.getMyProfile()
-        } catch (e: Exception) {
-            Log.e("ErthiScan", "Failed to load challenges", e)
-        }
-    }
-
-    if (editingChallenge != null) {
-        val c = editingChallenge!!
-        CreateReportScreen(
-            companyId = c.companyId,
-            companyName = c.companyName,
-            editReportId = c.id,
-            initialText = c.text,
-            initialSource = c.sources.firstOrNull() ?: "",
-            onBack = { editingChallenge = null },
-            onSubmitted = {
-                editingChallenge = null
-                refreshKey++
-            }
-        )
-        return
-    }
+    LaunchedEffect(Unit) { vm.refresh() }
 
     if (deletingChallenge != null) {
         ConfirmDeleteDialog(
-            text = "Delete this challenge?",
+            text = stringResource(R.string.delete_challenge_confirmation),
             onConfirm = {
                 val c = deletingChallenge!!
                 deletingChallenge = null
-                scope.launch {
-                    try {
-                        ApiClient.api.deleteReport(c.id)
-                        refreshKey++
-                    } catch (e: Exception) {
-                        Log.e("ErthiScan", "Failed to delete challenge", e)
-                    }
-                }
+                vm.deleteReport(c.id)
             },
             onDismiss = { deletingChallenge = null }
         )
@@ -417,103 +334,110 @@ private fun MyChallengesScreen(
 
     BackHandler { onBack() }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colorScheme.background)
-            .systemBarsPadding()
-    ) {
-        Text(
-            text = "My Challenges",
-            color = colorScheme.onBackground,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-        )
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets.safeDrawing
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colorScheme.background)
+                .padding(padding)
+                .consumeWindowInsets(padding)
+        ) {
+            Text(
+                text = stringResource(R.string.my_challenges),
+                color = colorScheme.onBackground,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            )
 
-        if (profile == null) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Loading...", color = colorScheme.onSurfaceVariant)
-            }
-        } else if (profile!!.challenges.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No challenges yet", color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(profile!!.challenges, key = { it.id }) { challenge ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(colorScheme.surfaceContainerHigh)
-                            .clickable { onCompanyClick(challenge.companyId, challenge.parentId) }
-                            .padding(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+            if (ui.loading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(stringResource(R.string.loading), color = colorScheme.onSurfaceVariant)
+                }
+            } else if (ui.profile?.challenges?.isEmpty() != false) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(stringResource(R.string.no_challenges_yet), color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    items(ui.profile!!.challenges, key = { it.id }) { challenge ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(colorScheme.surfaceContainerHigh)
+                                .clickable { onCompanyClick(challenge.companyId, challenge.id) }
+                                .padding(16.dp)
                         ) {
-                            Text(
-                                text = challenge.companyName,
-                                color = colorScheme.primary,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            val voteColor = when {
-                                challenge.voteSum > 0 -> Color(0xFF43A047)
-                                challenge.voteSum < 0 -> Color(0xFFE53935)
-                                else -> colorScheme.onSurfaceVariant
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = challenge.companyName,
+                                    color = colorScheme.primary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                val voteColor = when {
+                                    challenge.voteSum > 0 -> Color(0xFF43A047)
+                                    challenge.voteSum < 0 -> Color(0xFFE53935)
+                                    else -> colorScheme.onSurfaceVariant
+                                }
+                                Text(
+                                    text = if (challenge.voteSum > 0) "+${challenge.voteSum}" else challenge.voteSum.toString(),
+                                    color = voteColor,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
                             Text(
-                                text = if (challenge.voteSum > 0) "+${challenge.voteSum}" else challenge.voteSum.toString(),
-                                color = voteColor,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
+                                text = challenge.text,
+                                color = colorScheme.onSurface,
+                                fontSize = 14.sp
                             )
-                        }
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                        Text(
-                            text = challenge.text,
-                            color = colorScheme.onSurface,
-                            fontSize = 14.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            EditChip(onClick = { editingChallenge = challenge })
-                            DeleteChip(onClick = { deletingChallenge = challenge })
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                EditChip(onClick = { onEdit(challenge) })
+                                DeleteChip(onClick = { deletingChallenge = challenge })
+                            }
                         }
                     }
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
                 }
-
-                item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
     }
 }
 
 @Composable
-private fun SignInScreen() {
+private fun SignInScreen(onGoogleIdToken: (String) -> Unit) {
     val colorScheme = MaterialTheme.colorScheme
-    val activity = LocalContext.current as ComponentActivity
-    val scope = activity.lifecycleScope
+    val activity = LocalActivity.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -523,7 +447,7 @@ private fun SignInScreen() {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "ErthiScan",
+            text = stringResource(R.string.app_name),
             color = colorScheme.onBackground,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold
@@ -532,7 +456,7 @@ private fun SignInScreen() {
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Sign in to create reports and vote",
+            text = stringResource(R.string.sign_in_subtitle),
             color = colorScheme.onSurfaceVariant,
             fontSize = 16.sp
         )
@@ -543,7 +467,8 @@ private fun SignInScreen() {
             onClick = {
                 scope.launch {
                     try {
-                        val credentialManager = CredentialManager.create(activity)
+                        val currentActivity = activity ?: return@launch
+                        val credentialManager = CredentialManager.create(context)
                         val googleIdOption = GetGoogleIdOption.Builder()
                             .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
                             .setFilterByAuthorizedAccounts(false)
@@ -551,12 +476,12 @@ private fun SignInScreen() {
                         val request = GetCredentialRequest.Builder()
                             .addCredentialOption(googleIdOption)
                             .build()
-                        val result = credentialManager.getCredential(activity, request)
+                        val result = credentialManager.getCredential(currentActivity, request)
                         val googleIdToken = GoogleIdTokenCredential.createFrom(result.credential.data)
                         val idToken = googleIdToken.idToken
-
-                        val response = ApiClient.api.authGoogle(GoogleAuthRequest(token = idToken))
-                        AuthManager.login(response.accessToken, response.refreshToken, response.userId, response.username, activity)
+                        onGoogleIdToken(idToken)
+                    } catch (e: NoCredentialException) {
+                        Log.d("ErthiScan", "No credential found", e)
                     } catch (e: Exception) {
                         Log.e("ErthiScan", "Sign in failed", e)
                     }
@@ -570,7 +495,7 @@ private fun SignInScreen() {
             )
         ) {
             Text(
-                text = "Sign in with Google",
+                text = stringResource(R.string.sign_in_google),
                 fontSize = 16.sp,
                 modifier = Modifier.padding(vertical = 8.dp)
             )

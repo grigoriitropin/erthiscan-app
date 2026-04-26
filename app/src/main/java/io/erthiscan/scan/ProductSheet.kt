@@ -1,7 +1,6 @@
 package io.erthiscan.scan
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,9 +24,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
+import io.erthiscan.R
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,9 +41,8 @@ fun ProductSheet(
     ethicalScore: Float,
     hasReports: Boolean,
     openFactsUrl: String?,
-    barcode: String,
     onDismiss: () -> Unit,
-    onViewCompany: (Int) -> Unit
+    onViewCompany: (Int) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val colorScheme = MaterialTheme.colorScheme
@@ -68,7 +69,7 @@ fun ProductSheet(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Ethical Score",
+                    text = stringResource(R.string.ethical_score),
                     color = colorScheme.onSurfaceVariant,
                     fontSize = 14.sp
                 )
@@ -88,7 +89,7 @@ fun ProductSheet(
                     )
                 } else {
                     Text(
-                        text = "—",
+                        text = stringResource(R.string.score_dash),
                         color = colorScheme.onSurfaceVariant,
                         fontSize = 28.sp
                     )
@@ -109,7 +110,7 @@ fun ProductSheet(
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "product", color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text(text = stringResource(R.string.product_label), color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(text = productName, color = colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 }
@@ -122,7 +123,7 @@ fun ProductSheet(
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "company", color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Text(text = stringResource(R.string.company_label), color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(text = companyName, color = colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 }
@@ -143,7 +144,7 @@ fun ProductSheet(
                 )
             ) {
                 Text(
-                    text = "View Company Page",
+                    text = stringResource(R.string.view_company_page),
                     fontSize = 16.sp,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
@@ -154,7 +155,7 @@ fun ProductSheet(
             if (openFactsUrl != null) {
                 Button(
                     onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(openFactsUrl)))
+                        context.startActivity(Intent(Intent.ACTION_VIEW, openFactsUrl.toUri()))
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -164,7 +165,7 @@ fun ProductSheet(
                     )
                 ) {
                     Text(
-                        text = "Product Information Source",
+                        text = stringResource(R.string.product_information_source),
                         fontSize = 16.sp,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )

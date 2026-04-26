@@ -1,9 +1,9 @@
 package io.erthiscan.company.page
 
-import android.util.Log
-import androidx.activity.ComponentActivity
-import androidx.lifecycle.lifecycleScope
+import io.erthiscan.R
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,7 +17,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,6 +29,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,153 +45,94 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.erthiscan.api.ApiClient
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.erthiscan.api.CompanyDetail
 import io.erthiscan.api.ReportItem
 import io.erthiscan.api.SubReportItem
-import io.erthiscan.api.VoteRequest
-import io.erthiscan.auth.AuthManager
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-enum class CompanyPageScreen { DETAIL, CREATE_REPORT, CREATE_CHALLENGE, EDIT_REPORT }
-
 @Composable
-fun CompanyPage(companyId: Int, onBack: () -> Unit, scrollToReportId: Int? = null) {
+fun CompanyPage(
+    onBack: () -> Unit,
+    onCreateReport: (String) -> Unit,
+    onCreateChallenge: (String, Int) -> Unit,
+    onEditReport: (Int, String, String, String) -> Unit,
+    vm: CompanyPageViewModel = hiltViewModel(),
+) {
     val colorScheme = MaterialTheme.colorScheme
-    var company by remember { mutableStateOf<CompanyDetail?>(null) }
-    var screen by remember { mutableStateOf(CompanyPageScreen.DETAIL) }
-    var challengeParentId by remember { mutableStateOf<Int?>(null) }
-    var editReportId by remember { mutableStateOf<Int?>(null) }
-    var editInitialText by remember { mutableStateOf("") }
-    var editInitialSource by remember { mutableStateOf("") }
-    var refreshKey by remember { mutableIntStateOf(0) }
+    val state by vm.state.collectAsStateWithLifecycle()
+    val data = state.company
+    val context = LocalContext.current
     val listState = rememberLazyListState()
-    var pendingScrollId by remember { mutableStateOf(scrollToReportId) }
-    val activity = LocalContext.current as ComponentActivity
-    val scope = activity.lifecycleScope
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(companyId, refreshKey) {
-        try {
-            company = ApiClient.api.getCompany(companyId)
-        } catch (e: Exception) {
-            Log.e("ErthiScan", "Failed to load company", e)
+    LaunchedEffect(state.error) {
+        state.error?.let {
+            snackbarHostState.showSnackbar(it.asString(context))
+            vm.dismissError()
         }
     }
 
-    // Scroll to the requested report once after data loads
-    LaunchedEffect(company, pendingScrollId) {
-        val target = pendingScrollId ?: return@LaunchedEffect
-        val loaded = company ?: return@LaunchedEffect
-        val reportIndex = loaded.reports.indexOfFirst { it.id == target }
-        if (reportIndex >= 0) {
-            // Header items before reports list:
-            // ScoreCard (1) + Add Report button if logged in (1) + "Reports" title (1)
-            val headerCount = 2 + (if (AuthManager.isLoggedIn) 1 else 0)
-            listState.scrollToItem(headerCount + reportIndex)
-            pendingScrollId = null
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        contentWindowInsets = WindowInsets.systemBars
+    ) { padding: PaddingValues ->
+        if (data == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(colorScheme.background)
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(if (state.loading) stringResource(R.string.loading) else stringResource(R.string.failed_to_load), color = colorScheme.onSurfaceVariant)
+            }
+            return@Scaffold
         }
-    }
 
-    when (screen) {
-        CompanyPageScreen.CREATE_REPORT -> {
-            CreateReportScreen(
-                companyId = companyId,
-                companyName = company?.name ?: "",
-                onBack = { screen = CompanyPageScreen.DETAIL },
-                onSubmitted = {
-                    screen = CompanyPageScreen.DETAIL
-                    refreshKey++
-                }
-            )
-            return
-        }
-        CompanyPageScreen.CREATE_CHALLENGE -> {
-            CreateReportScreen(
-                companyId = companyId,
-                companyName = company?.name ?: "",
-                parentId = challengeParentId,
-                onBack = { screen = CompanyPageScreen.DETAIL },
-                onSubmitted = {
-                    pendingScrollId = challengeParentId
-                    screen = CompanyPageScreen.DETAIL
-                    refreshKey++
-                }
-            )
-            return
-        }
-        CompanyPageScreen.EDIT_REPORT -> {
-            CreateReportScreen(
-                companyId = companyId,
-                companyName = company?.name ?: "",
-                editReportId = editReportId,
-                initialText = editInitialText,
-                initialSource = editInitialSource,
-                onBack = { screen = CompanyPageScreen.DETAIL },
-                onSubmitted = {
-                    screen = CompanyPageScreen.DETAIL
-                    refreshKey++
-                }
-            )
-            return
-        }
-        CompanyPageScreen.DETAIL -> {}
-    }
-
-    val data = company
-    if (data == null) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(colorScheme.background),
-            contentAlignment = Alignment.Center
+                .background(colorScheme.background)
+                .padding(padding)
+                .consumeWindowInsets(padding)
         ) {
-            Text("Loading...", color = colorScheme.onSurfaceVariant)
-        }
-        return
-    }
+            Text(
+                text = data.name,
+                color = colorScheme.onBackground,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            )
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colorScheme.background)
-            .systemBarsPadding()
-    ) {
-        Text(
-            text = data.name,
-            color = colorScheme.onBackground,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        )
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item {
+                    ScoreCard(data.ethicalScore, data.reportCount)
+                }
 
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item {
-                ScoreCard(data.ethicalScore, data.reportCount)
-            }
-
-            if (AuthManager.isLoggedIn) {
                 item {
                     Button(
-                        onClick = { screen = CompanyPageScreen.CREATE_REPORT },
+                        onClick = { onCreateReport(data.name) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -194,87 +141,59 @@ fun CompanyPage(companyId: Int, onBack: () -> Unit, scrollToReportId: Int? = nul
                         )
                     ) {
                         Text(
-                            text = "Add Report",
+                            text = stringResource(R.string.add_report),
                             fontSize = 16.sp,
                             modifier = Modifier.padding(vertical = 4.dp)
                         )
                     }
                 }
-            }
 
-            item {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Reports",
-                    color = colorScheme.onBackground,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            if (data.reports.isEmpty()) {
                 item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(colorScheme.surfaceContainerHigh)
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No reports yet",
-                            color = colorScheme.onSurfaceVariant,
-                            fontSize = 14.sp
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(R.string.reports),
+                        color = colorScheme.onBackground,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (data.reports.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(colorScheme.surfaceContainerHigh)
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = stringResource(R.string.no_reports_yet),
+                                color = colorScheme.onSurfaceVariant,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                } else {
+                    items(data.reports, key = { it.id }) { report ->
+                        ReportCardWithSubs(
+                            report = report,
+                            onChallenge = { onCreateChallenge(data.name, report.id) },
+                            onEdit = { onEditReport(report.id, report.text, report.sources.firstOrNull() ?: "", data.name) },
+                            onDelete = { vm.delete(report.id) },
+                            onVote = { reportId, value -> vm.vote(reportId, value) },
+                            onSubEdit = { sub ->
+                                onEditReport(sub.id, sub.text, sub.sources.firstOrNull() ?: "", data.name)
+                            },
+                            onSubDelete = { sub -> vm.delete(sub.id) },
+                            onSubVote = { subId, value -> vm.vote(subId, value) },
                         )
                     }
                 }
-            } else {
-                items(data.reports, key = { it.id }) { report ->
-                    ReportCardWithSubs(
-                        report = report,
-                        onChallenge = {
-                            challengeParentId = report.id
-                            screen = CompanyPageScreen.CREATE_CHALLENGE
-                        },
-                        onVoteUpdated = { refreshKey++ },
-                        onEdit = {
-                            editReportId = report.id
-                            editInitialText = report.text
-                            editInitialSource = report.sources.firstOrNull() ?: ""
-                            screen = CompanyPageScreen.EDIT_REPORT
-                        },
-                        onDelete = {
-                            scope.launch {
-                                try {
-                                    ApiClient.api.deleteReport(report.id)
-                                    refreshKey++
-                                } catch (e: Exception) {
-                                    Log.e("ErthiScan", "Failed to delete report", e)
-                                }
-                            }
-                        },
-                        onSubEdit = { sub ->
-                            editReportId = sub.id
-                            editInitialText = sub.text
-                            editInitialSource = sub.sources.firstOrNull() ?: ""
-                            screen = CompanyPageScreen.EDIT_REPORT
-                        },
-                        onSubDelete = { sub ->
-                            scope.launch {
-                                try {
-                                    ApiClient.api.deleteReport(sub.id)
-                                    refreshKey++
-                                } catch (e: Exception) {
-                                    Log.e("ErthiScan", "Failed to delete challenge", e)
-                                }
-                            }
-                        }
-                    )
-                }
-            }
 
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+                item { Spacer(modifier = Modifier.height(16.dp)) }
+            }
         }
     }
 }
@@ -293,7 +212,7 @@ private fun ScoreCard(ethicalScore: Float, reportCount: Int) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Ethical Score",
+            text = stringResource(R.string.ethical_score),
             color = colorScheme.onSurfaceVariant,
             fontSize = 14.sp
         )
@@ -314,14 +233,14 @@ private fun ScoreCard(ethicalScore: Float, reportCount: Int) {
             )
         } else {
             Text(
-                text = "—",
+                text = stringResource(R.string.score_dash),
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 36.sp
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "$reportCount reports",
+            text = pluralStringResource(R.plurals.reports_count, reportCount, reportCount),
             color = colorScheme.onSurfaceVariant,
             fontSize = 12.sp
         )
@@ -332,30 +251,26 @@ private fun ScoreCard(ethicalScore: Float, reportCount: Int) {
 private fun ReportCardWithSubs(
     report: ReportItem,
     onChallenge: () -> Unit,
-    onVoteUpdated: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onVote: (Int, Int) -> Unit,
     onSubEdit: (SubReportItem) -> Unit,
-    onSubDelete: (SubReportItem) -> Unit
+    onSubDelete: (SubReportItem) -> Unit,
+    onSubVote: (Int, Int) -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val activity = LocalContext.current as ComponentActivity
-    val scope = activity.lifecycleScope
     val uriHandler = LocalUriHandler.current
-    var ethicalCount by remember(report.id) { mutableIntStateOf(report.ethicalCount) }
-    var unethicalCount by remember(report.id) { mutableIntStateOf(report.unethicalCount) }
-    var userVote by remember(report.id) { mutableStateOf(report.userVote) }
+
     var expanded by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    val isMine = AuthManager.isLoggedIn && AuthManager.userId == report.userId
 
-    val voteSum = ethicalCount - unethicalCount
+    val voteSum = report.ethicalCount - report.unethicalCount
     val challengePenalty = report.subReports.sumOf { maxOf(0, it.trueCount - it.falseCount) }
     val isDisputed = voteSum > 0 && challengePenalty >= 0.7 * voteSum
 
     if (showDeleteDialog) {
         ConfirmDeleteDialog(
-            text = "Delete this report? Its challenges will also be removed.",
+            text = stringResource(R.string.delete_report_confirmation),
             onConfirm = {
                 showDeleteDialog = false
                 onDelete()
@@ -379,167 +294,132 @@ private fun ReportCardWithSubs(
                     .background(Color(0xFFE53935))
             )
         }
-    Column(
-        modifier = Modifier
-            .weight(1f)
-            .padding(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(16.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = report.author,
-                    color = colorScheme.onSurface,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = report.createdAt.take(10),
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp
-                )
-            }
-            if (isMine) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = report.author,
+                        color = colorScheme.onSurface,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = report.createdAt.take(10),
+                        color = colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     EditChip(onClick = onEdit)
                     DeleteChip(onClick = { showDeleteDialog = true })
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = report.text,
-            color = colorScheme.onSurface,
-            fontSize = 14.sp
-        )
-
-        if (report.sources.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
-            report.sources.forEach { source ->
-                val uri = if (source.startsWith("http://") || source.startsWith("https://")) source else "https://$source"
-                Text(
-                    text = source,
-                    color = colorScheme.primary,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textDecoration = TextDecoration.Underline,
-                    modifier = Modifier.clickable {
-                        try { uriHandler.openUri(uri) } catch (_: Exception) {}
-                    }
-                )
+
+            Text(
+                text = report.text,
+                color = colorScheme.onSurface,
+                fontSize = 14.sp
+            )
+
+            if (report.sources.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                report.sources.forEach { source ->
+                    val uri = if (source.startsWith("http://") || source.startsWith("https://")) source else "https://$source"
+                    Text(
+                        text = source,
+                        color = colorScheme.primary,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.clickable {
+                            try { uriHandler.openUri(uri) } catch (_: Exception) {}
+                        }
+                    )
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-        // Vote chips row
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Ethical chip
-            VoteChip(
-                label = "Ethical",
-                count = ethicalCount,
-                color = Color(0xFF43A047),
-                isSelected = userVote == 1,
-                onClick = {
-                    if (!AuthManager.isLoggedIn) return@VoteChip
-                    scope.launch {
-                        try {
-                            val resp = ApiClient.api.vote(report.id, VoteRequest(1))
-                            ethicalCount = resp.ethicalCount
-                            unethicalCount = resp.unethicalCount
-                            userVote = resp.userVote
-                            onVoteUpdated()
-                        } catch (e: Exception) {
-                            Log.e("ErthiScan", "Vote failed", e)
-                        }
-                    }
-                }
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                VoteChip(
+                    label = stringResource(R.string.ethical),
+                    count = report.ethicalCount,
+                    color = Color(0xFF43A047),
+                    isSelected = report.userVote == 1,
+                    onClick = { onVote(report.id, 1) }
+                )
 
-            // Unethical chip
-            VoteChip(
-                label = "Unethical",
-                count = unethicalCount,
-                color = Color(0xFFE53935),
-                isSelected = userVote == -1,
-                onClick = {
-                    if (!AuthManager.isLoggedIn) return@VoteChip
-                    scope.launch {
-                        try {
-                            val resp = ApiClient.api.vote(report.id, VoteRequest(-1))
-                            ethicalCount = resp.ethicalCount
-                            unethicalCount = resp.unethicalCount
-                            userVote = resp.userVote
-                            onVoteUpdated()
-                        } catch (e: Exception) {
-                            Log.e("ErthiScan", "Vote failed", e)
-                        }
-                    }
-                }
-            )
+                VoteChip(
+                    label = stringResource(R.string.unethical),
+                    count = report.unethicalCount,
+                    color = Color(0xFFE53935),
+                    isSelected = report.userVote == -1,
+                    onClick = { onVote(report.id, -1) }
+                )
 
-            Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.weight(1f))
 
-            // Challenge button
-            if (AuthManager.isLoggedIn) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(colorScheme.surfaceContainerHighest)
                         .clickable { onChallenge() }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = "Challenge",
+                        text = stringResource(R.string.challenge),
                         color = colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                 }
             }
-        }
 
-        // Sub-reports
-        if (report.subReports.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { expanded = !expanded }
-                    .padding(vertical = 4.dp)
-            ) {
-                Text(
-                    text = if (expanded) "Hide challenges (${report.subReports.size})"
-                           else "Show challenges (${report.subReports.size})",
-                    color = colorScheme.primary,
-                    fontSize = 12.sp
-                )
-            }
+            if (report.subReports.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { expanded = !expanded }
+                        .padding(vertical = 4.dp)
+                ) {
+                    Text(
+                         text = if (expanded) pluralStringResource(R.plurals.hide_challenges, report.subReports.size, report.subReports.size)
+                               else pluralStringResource(R.plurals.show_challenges, report.subReports.size, report.subReports.size),
+                        color = colorScheme.primary,
+                        fontSize = 12.sp
+                    )
+                }
 
-            AnimatedVisibility(visible = expanded) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    report.subReports.forEach { sub ->
-                        SubReportCard(
-                            sub = sub,
-                            onEdit = { onSubEdit(sub) },
-                            onDelete = { onSubDelete(sub) }
-                        )
+                AnimatedVisibility(visible = expanded) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        report.subReports.forEach { sub ->
+                            SubReportCard(
+                                sub = sub,
+                                onEdit = { onSubEdit(sub) },
+                                onDelete = { onSubDelete(sub) },
+                                onVote = { subId, value -> onSubVote(subId, value) },
+                            )
+                        }
                     }
                 }
             }
         }
-    }
     }
 }
 
@@ -547,21 +427,17 @@ private fun ReportCardWithSubs(
 private fun SubReportCard(
     sub: SubReportItem,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onVote: (Int, Int) -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val activity = LocalContext.current as ComponentActivity
-    val scope = activity.lifecycleScope
     val uriHandler = LocalUriHandler.current
-    var trueCount by remember(sub.id) { mutableIntStateOf(sub.trueCount) }
-    var falseCount by remember(sub.id) { mutableIntStateOf(sub.falseCount) }
-    var userVote by remember(sub.id) { mutableStateOf(sub.userVote) }
+
     var showDeleteDialog by remember { mutableStateOf(false) }
-    val isMine = AuthManager.isLoggedIn && AuthManager.userId == sub.userId
 
     if (showDeleteDialog) {
         ConfirmDeleteDialog(
-            text = "Delete this challenge?",
+            text = stringResource(R.string.delete_challenge_confirmation),
             onConfirm = {
                 showDeleteDialog = false
                 onDelete()
@@ -587,11 +463,9 @@ private fun SubReportCard(
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 11.sp
             )
-            if (isMine) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    EditChip(onClick = onEdit)
-                    DeleteChip(onClick = { showDeleteDialog = true })
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                EditChip(onClick = onEdit)
+                DeleteChip(onClick = { showDeleteDialog = true })
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -623,42 +497,18 @@ private fun SubReportCard(
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             VoteChip(
-                label = "True",
-                count = trueCount,
+                 label = stringResource(R.string.true_label),
+                    count = sub.trueCount,
                 color = Color(0xFF43A047),
-                isSelected = userVote == 1,
-                onClick = {
-                    if (!AuthManager.isLoggedIn) return@VoteChip
-                    scope.launch {
-                        try {
-                            val resp = ApiClient.api.vote(sub.id, VoteRequest(1))
-                            trueCount = resp.ethicalCount
-                            falseCount = resp.unethicalCount
-                            userVote = resp.userVote
-                        } catch (e: Exception) {
-                            Log.e("ErthiScan", "Vote failed", e)
-                        }
-                    }
-                }
+                    isSelected = sub.userVote == 1,
+                onClick = { onVote(sub.id, 1) }
             )
             VoteChip(
-                label = "False",
-                count = falseCount,
+                 label = stringResource(R.string.false_label),
+                    count = sub.falseCount,
                 color = Color(0xFFE53935),
-                isSelected = userVote == -1,
-                onClick = {
-                    if (!AuthManager.isLoggedIn) return@VoteChip
-                    scope.launch {
-                        try {
-                            val resp = ApiClient.api.vote(sub.id, VoteRequest(-1))
-                            trueCount = resp.ethicalCount
-                            falseCount = resp.unethicalCount
-                            userVote = resp.userVote
-                        } catch (e: Exception) {
-                            Log.e("ErthiScan", "Vote failed", e)
-                        }
-                    }
-                }
+                    isSelected = sub.userVote == -1,
+                onClick = { onVote(sub.id, -1) }
             )
         }
     }
@@ -703,7 +553,7 @@ internal fun EditChip(onClick: () -> Unit) {
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
         Text(
-            text = "Edit",
+            text = stringResource(R.string.edit),
             color = colorScheme.onSurfaceVariant,
             fontSize = 11.sp
         )
@@ -721,7 +571,7 @@ internal fun DeleteChip(onClick: () -> Unit) {
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
         Text(
-            text = "Delete",
+            text = stringResource(R.string.delete),
             color = colorScheme.onErrorContainer,
             fontSize = 11.sp
         )
@@ -732,16 +582,16 @@ internal fun DeleteChip(onClick: () -> Unit) {
 internal fun ConfirmDeleteDialog(text: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete") },
+        title = { Text(stringResource(R.string.delete)) },
         text = { Text(text) },
         confirmButton = {
             androidx.compose.material3.TextButton(onClick = onConfirm) {
-                Text("Delete", color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
             }
         },
         dismissButton = {
             androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )

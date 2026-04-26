@@ -1,0 +1,49 @@
+# Baseline Profile for Erthiscan
+# Auto-generated startup profile — regenerate via Macrobenchmark before release
+# Startup
+HSPLandroidx/compose/runtime/ComposerImpl
+HSPLandroidx/compose/ui/platform/AndroidComposeView
+HSPLandroidx/activity/ComponentActivity
+HSPLandroidx/camera/core/Preview
+HSPLandroidx/camera/core/CameraSelector
+HSPLandroidx/lifecycle/compose/collectAsStateWithLifecycle
+HSPLio/erthiscan/MainActivity
+HSPLio/erthiscan/MainScreen
+HSPLio/erthiscan/StartupViewModel
+HSPLio/erthiscan/auth/AuthManager
+HSPLio/erthiscan/scan/ScanScreen
+HSPLio/erthiscan/scan/ScanViewModel
+HSPLio/erthiscan/di/NetworkModule
+HSPLio/erthiscan/api/ErthiscanApi
+HSPLio/erthiscan/api/Models
+HSPLio/erthiscan/nav/Routes
+
+# Compose
+HSPLandroidx/compose/foundation/layout/Box
+HSPLandroidx/compose/foundation/layout/Column
+HSPLandroidx/compose/foundation/layout/Row
+HSPLandroidx/compose/material3/Scaffold
+HSPLandroidx/compose/material3/Button
+HSPLandroidx/compose/material3/Text
+HSPLandroidx/compose/material3/Tab
+HSPLandroidx/compose/foundation/background
+HSPLandroidx/compose/foundation/clickable
+HSPLandroidx/compose/foundation/shape/RoundedCornerShape
+
+# CameraX
+HSPLandroidx/camera/core/CameraX
+HSPLandroidx/camera/lifecycle/ProcessCameraProvider
+HSPLcom/google/mlkit/vision/barcode/BarcodeScanning
+
+# Kotlinx
+HSPLkotlinx/serialization/json/Json
+HSPLkotlinx/coroutines/flow/StateFlow
+
+# OkHttp/Retrofit
+HSPLokhttp3/OkHttpClient
+HSPLretrofit2/Retrofit
+HSPLretrofit2/KotlinExtensions
+
+# Hilt
+HSPLdagger/hilt/android/HiltAndroidApp
+HSPLdagger/hilt/android/AndroidEntryPoint

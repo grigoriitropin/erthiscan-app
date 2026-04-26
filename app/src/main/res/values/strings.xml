@@ -1,3 +1,87 @@
 <resources>
     <string name="app_name">Erthiscan</string>
+    <string name="companies_title">Companies</string>
+    <string name="search_companies_hint">Search companies…</string>
+    <string name="loading">Loading…</string>
+    <string name="no_companies_found">No companies found</string>
+    <plurals name="reports_count">
+        <item quantity="one">%d report</item>
+        <item quantity="other">%d reports</item>
+    </plurals>
+    <string name="score_dash">—</string>
+    <string name="previous_page">←</string>
+    <string name="next_page">→</string>
+    <string name="page_indicator">%1$d / %2$d</string>
+    <string name="sort_reports">Reports</string>
+    <string name="sort_score_desc">Score ↓</string>
+    <string name="sort_score_asc">Score ↑</string>
+    <string name="sort_name_asc">A → Z</string>
+    <string name="sort_name_desc">Z → A</string>
+    <!-- Profile -->
+    <string name="my_reports">My Reports</string>
+    <string name="my_challenges">My Challenges</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="sign_in_subtitle">Sign in to create reports and vote</string>
+    <string name="sign_in_google">Sign in with Google</string>
+    <string name="no_reports_yet">No reports yet</string>
+    <string name="no_challenges_yet">No challenges yet</string>
+    <plurals name="reports_and_challenges">
+        <item quantity="one">%1$d report · %2$d challenge</item>
+        <item quantity="other">%1$d reports · %2$d challenges</item>
+    </plurals>
+    <!-- Company Page -->
+    <string name="failed_to_load">Failed to load</string>
+    <string name="add_report">Add Report</string>
+    <string name="reports">Reports</string>
+    <string name="ethical_score">Ethical Score</string>
+    <string name="ethical">Ethical</string>
+    <string name="unethical">Unethical</string>
+    <string name="challenge">Challenge</string>
+    <plurals name="hide_challenges">
+        <item quantity="one">Hide challenge (%d)</item>
+        <item quantity="other">Hide challenges (%d)</item>
+    </plurals>
+    <plurals name="show_challenges">
+        <item quantity="one">Show challenge (%d)</item>
+        <item quantity="other">Show challenges (%d)</item>
+    </plurals>
+    <string name="true_label">True</string>
+    <string name="false_label">False</string>
+    <string name="edit">Edit</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <!-- Create Report -->
+    <string name="edit_report">Edit Report</string>
+    <string name="challenge_report">Challenge Report</string>
+    <string name="write_report_hint">Write your report here…</string>
+    <string name="source_url_hint">Source URL…</string>
+    <string name="submitting">Submitting…</string>
+    <string name="submit">Submit</string>
+    <!-- Error messages -->
+    <string name="delete_report_confirmation">Delete this report? Its challenges will also be removed.</string>
+    <string name="delete_challenge_confirmation">Delete this challenge?</string>
+    <string name="report_text_required">Report text is required</string>
+    <string name="source_url_required">Source URL is required</string>
+    <string name="error_no_internet">No internet connection</string>
+    <string name="error_unauthorized">Unauthorized access</string>
+    <string name="error_not_found">Resource not found</string>
+    <string name="error_server">Server error</string>
+    <string name="error_unknown">Unknown error</string>
+    <string name="error_submit_failed">Failed to submit report</string>
+    <!-- Scan -->
+    <string name="scan_barcode">Scan Barcode</string>
+    <string name="toggle_flashlight">Toggle flashlight</string>
+    <string name="tab_companies">Companies</string>
+    <string name="tab_scan">Scan</string>
+    <string name="tab_profile">Profile</string>
+    <!-- Product sheet -->
+    <string name="product_label">product</string>
+    <string name="company_label">company</string>
+    <string name="view_company_page">View Company Page</string>
+    <string name="product_information_source">Product Information Source</string>
+    <!-- Not found sheet -->
+    <string name="product_not_found">Product Not Found</string>
+    <string name="help_build_database">Help build the database</string>
+    <string name="open_food_facts_explanation">ErthiScan uses Open Food Facts — a free, open product database. If you add this product there, it will become available to everyone using ErthiScan and any other app built on Open Food Facts.</string>
+    <string name="add_on_open_food_facts">Add on Open Food Facts</string>
 </resources>

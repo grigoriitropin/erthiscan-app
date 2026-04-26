@@ -22,10 +22,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
+import io.erthiscan.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,7 +61,7 @@ fun ProductNotFoundSheet(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Product Not Found",
+                    text = stringResource(R.string.product_not_found),
                     color = colorScheme.onSurface,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
@@ -83,14 +86,14 @@ fun ProductNotFoundSheet(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Help build the database",
+                    text = stringResource(R.string.help_build_database),
                     color = colorScheme.onSurface,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "ErthiScan uses Open Food Facts — a free, open product database. If you add this product there, it will become available to everyone using ErthiScan and any other app built on Open Food Facts.",
+                    text = stringResource(R.string.open_food_facts_explanation),
                     color = colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center
@@ -102,16 +105,10 @@ fun ProductNotFoundSheet(
             Button(
                 onClick = {
                     val pkg = "org.openfoodfacts.scanner"
-                    val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg"))
                     try {
-                        context.startActivity(market)
-                    } catch (_: ActivityNotFoundException) {
-                        context.startActivity(
-                            Intent(
-                                Intent.ACTION_VIEW,
-                                Uri.parse("https://play.google.com/store/apps/details?id=$pkg")
-                            )
-                        )
+                        context.startActivity(Intent(Intent.ACTION_VIEW, "market://details?id=$pkg".toUri()))
+                    } catch (_: Exception) {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://play.google.com/store/apps/details?id=$pkg".toUri()))
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -122,7 +119,7 @@ fun ProductNotFoundSheet(
                 )
             ) {
                 Text(
-                    text = "Add on Open Food Facts",
+                    text = stringResource(R.string.add_on_open_food_facts),
                     fontSize = 16.sp,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
