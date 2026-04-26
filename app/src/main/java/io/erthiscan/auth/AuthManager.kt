@@ -1,131 +1,155 @@
 package io.erthiscan.auth
 
 import android.content.Context
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import android.util.Base64
+import android.util.Log
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.crypto.tink.Aead
-import com.google.crypto.tink.aead.AeadConfig
-import com.google.crypto.tink.aead.AeadKeyTemplates
+import com.google.crypto.tink.KeyTemplates
+import com.google.crypto.tink.RegistryConfiguration
 import com.google.crypto.tink.integration.android.AndroidKeysetManager
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import android.util.Base64
-import android.util.Log
-import io.erthiscan.api.ApiClient
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import java.security.GeneralSecurityException
+import javax.inject.Inject
+import javax.inject.Singleton
+
+data class AuthState(
+    val accessToken: String? = null,
+    val refreshToken: String? = null,
+    val userId: Int? = null,
+    val username: String? = null,
+) {
+    val isLoggedIn: Boolean get() = accessToken != null
+}
 
 private val Context.authDataStore by preferencesDataStore(name = "auth")
 
-object AuthManager {
-    var accessToken: String? by mutableStateOf(null)
-        private set
-    var refreshToken: String? by mutableStateOf(null)
-        private set
-    var userId: Int? by mutableStateOf(null)
-        private set
-    var username: String? by mutableStateOf(null)
-        private set
-
-    val isLoggedIn: Boolean get() = accessToken != null
-
+@Singleton
+class AuthManager @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
     private val KEY_TOKEN = stringPreferencesKey("token")
     private val KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
     private val KEY_USER_ID = intPreferencesKey("user_id")
     private val KEY_USERNAME = stringPreferencesKey("username")
 
-    private var appContext: Context? = null
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val mutex = Mutex()
 
-    private fun getAead(context: Context): Aead {
-        AeadConfig.register()
-        return AndroidKeysetManager.Builder()
-            .withSharedPref(context, "auth_keyset", "auth_keyset_prefs")
-            .withKeyTemplate(AeadKeyTemplates.AES256_GCM)
-            .withMasterKeyUri("android-keystore://erthiscan_master_key")
-            .build()
-            .keysetHandle
-            .getPrimitive(com.google.crypto.tink.RegistryConfiguration.get(), Aead::class.java)
-    }
+    @Volatile private var aeadCache: Aead? = null
 
-    private fun encrypt(aead: Aead, plaintext: String): String {
-        val ciphertext = aead.encrypt(plaintext.toByteArray(), null)
-        return Base64.encodeToString(ciphertext, Base64.NO_WRAP)
-    }
+    private val _state = MutableStateFlow(AuthState())
+    val state: StateFlow<AuthState> = _state.asStateFlow()
 
-    private fun decrypt(aead: Aead, ciphertext: String): String {
-        val decoded = Base64.decode(ciphertext, Base64.NO_WRAP)
-        return String(aead.decrypt(decoded, null))
-    }
+    // Synchronous snapshot for OkHttp interceptor
+    val accessToken: String? get() = _state.value.accessToken
+    val refreshToken: String? get() = _state.value.refreshToken
 
-    suspend fun login(token: String, refresh: String, id: Int, name: String, context: Context) {
-        appContext = context.applicationContext
-        accessToken = token
-        refreshToken = refresh
-        userId = id
-        username = name
-
-        val aead = getAead(context)
-        context.authDataStore.edit { prefs ->
-            prefs[KEY_TOKEN] = encrypt(aead, token)
-            prefs[KEY_REFRESH_TOKEN] = encrypt(aead, refresh)
-            prefs[KEY_USER_ID] = id
-            prefs[KEY_USERNAME] = encrypt(aead, name)
+    private suspend fun aead(): Aead = withContext(Dispatchers.IO) {
+        aeadCache ?: run {
+            val handle = AndroidKeysetManager.Builder()
+                .withSharedPref(context, "auth_keyset", "auth_keyset_prefs")
+                .withKeyTemplate(KeyTemplates.get("AES256_GCM"))
+                .withMasterKeyUri("android-keystore://erthiscan_master_key")
+                .build()
+                .keysetHandle
+            val a = handle.getPrimitive(RegistryConfiguration.get(), Aead::class.java)
+            aeadCache = a
+            a
         }
     }
 
-    fun updateTokens(access: String, refresh: String) {
-        accessToken = access
-        refreshToken = refresh
+    private suspend fun enc(plaintext: String): String = withContext(Dispatchers.Default) {
+        val ct = aead().encrypt(plaintext.toByteArray(), null)
+        Base64.encodeToString(ct, Base64.NO_WRAP)
+    }
 
-        val ctx = appContext ?: return
-        try {
-            val aead = getAead(ctx)
-            runBlocking {
-                ctx.authDataStore.edit { prefs ->
-                    prefs[KEY_TOKEN] = encrypt(aead, access)
-                    prefs[KEY_REFRESH_TOKEN] = encrypt(aead, refresh)
+    private suspend fun dec(ct: String): String = withContext(Dispatchers.Default) {
+        val bytes = Base64.decode(ct, Base64.NO_WRAP)
+        String(aead().decrypt(bytes, null))
+    }
+
+    suspend fun login(access: String, refresh: String, id: Int, name: String) = mutex.withLock {
+        _state.value = AuthState(access, refresh, id, name)
+        val encAccess = enc(access)
+        val encRefresh = enc(refresh)
+        val encName = enc(name)
+        context.authDataStore.edit { prefs ->
+            prefs[KEY_TOKEN] = encAccess
+            prefs[KEY_REFRESH_TOKEN] = encRefresh
+            prefs[KEY_USER_ID] = id
+            prefs[KEY_USERNAME] = encName
+        }
+    }
+
+    // Updates tokens synchronously in memory and triggers async DataStore write
+    fun updateTokensFromAuthenticator(access: String, refresh: String) {
+        _state.value = _state.value.copy(accessToken = access, refreshToken = refresh)
+        scope.launch {
+            mutex.withLock {
+                try {
+                    val encAccess = enc(access)
+                    val encRefresh = enc(refresh)
+                    context.authDataStore.edit { prefs ->
+                        prefs[KEY_TOKEN] = encAccess
+                        prefs[KEY_REFRESH_TOKEN] = encRefresh
+                    }
+                } catch (e: Exception) {
+                    Log.e("AuthManager", "Failed to persist refreshed tokens", e)
                 }
             }
-        } catch (e: Exception) {
-            Log.e("AuthManager", "Failed to persist refreshed tokens", e)
         }
     }
 
-    suspend fun restore(context: Context) {
-        appContext = context.applicationContext
-        val aead = getAead(context)
-        val prefs = context.authDataStore.data.first()
-        val encryptedToken = prefs[KEY_TOKEN] ?: return
-        val encryptedRefresh = prefs[KEY_REFRESH_TOKEN] ?: return
-        val encryptedName = prefs[KEY_USERNAME] ?: return
-        val id = prefs[KEY_USER_ID] ?: return
-
+    suspend fun restore() = mutex.withLock {
+        val prefs: Preferences = try {
+            context.authDataStore.data.first()
+        } catch (e: Exception) {
+            Log.e("AuthManager", "Failed to read DataStore; keeping in-memory state", e)
+            return@withLock
+        }
+        val encToken = prefs[KEY_TOKEN] ?: return@withLock
+        val encRefresh = prefs[KEY_REFRESH_TOKEN] ?: return@withLock
+        val encName = prefs[KEY_USERNAME] ?: return@withLock
+        val id = prefs[KEY_USER_ID] ?: return@withLock
         try {
-            accessToken = decrypt(aead, encryptedToken)
-            refreshToken = decrypt(aead, encryptedRefresh)
-            userId = id
-            username = decrypt(aead, encryptedName)
+            _state.value = AuthState(
+                accessToken = dec(encToken),
+                refreshToken = dec(encRefresh),
+                userId = id,
+                username = dec(encName),
+            )
+        } catch (e: GeneralSecurityException) {
+            // Keyset irrecoverably corrupted — safe to wipe
+            Log.e("AuthManager", "Keyset corrupted, wiping session", e)
+            clearLocal()
         } catch (e: Exception) {
-            Log.e("AuthManager", "Failed to restore session", e)
-            logout(context)
+            // Transient I/O — keep stored ciphertext, user can retry
+            Log.e("AuthManager", "Transient restore failure, keeping session on disk", e)
         }
     }
 
-    suspend fun logout(context: Context) {
-        if (accessToken != null) {
-            try {
-                ApiClient.api.logout()
-            } catch (e: Exception) {
-                Log.e("AuthManager", "Failed to call server logout", e)
-            }
-        }
-        accessToken = null
-        refreshToken = null
-        userId = null
-        username = null
+    suspend fun logoutLocal() = mutex.withLock {
+        clearLocal()
+    }
+
+    private suspend fun clearLocal() {
+        _state.value = AuthState()
         context.authDataStore.edit { it.clear() }
     }
 }

@@ -1,236 +1,186 @@
 package io.erthiscan.company
 
-import android.util.Log
+import io.erthiscan.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.erthiscan.api.ApiClient
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.erthiscan.api.CompanyItem
-import kotlinx.coroutines.CancellationException
 import kotlin.math.roundToInt
 
 @Composable
-fun CompaniesScreen(onCompanyClick: (Int) -> Unit = {}) {
+fun CompaniesScreen(
+    onCompanyClick: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
+    vm: CompaniesViewModel = hiltViewModel()
+) {
+    val state by vm.state.collectAsStateWithLifecycle()
     val colorScheme = MaterialTheme.colorScheme
-    var companies by remember { mutableStateOf<List<CompanyItem>>(emptyList()) }
-    var searchQuery by remember { mutableStateOf("") }
-    var debouncedQuery by remember { mutableStateOf("") }
-    var sortMode by remember { mutableStateOf("reports_desc") }
-    var currentPage by remember { mutableIntStateOf(1) }
-    var totalPages by remember { mutableIntStateOf(1) }
-    var loading by remember { mutableStateOf(true) }
+    val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
 
-    // Debounce search input
-    LaunchedEffect(searchQuery) {
-        if (searchQuery != debouncedQuery) {
-            kotlinx.coroutines.delay(300)
-            debouncedQuery = searchQuery
-            currentPage = 1
+    LaunchedEffect(state.query) {
+        if (state.companies.isNotEmpty()) listState.scrollToItem(0)
+    }
+
+    val context = LocalContext.current
+    LaunchedEffect(state.error) {
+        state.error?.let {
+            snackbarHostState.showSnackbar(it.asString(context))
+            vm.dismissError()
         }
     }
 
-    // Load data immediately when debounced query, sort, or page changes
-    LaunchedEffect(debouncedQuery, sortMode, currentPage) {
-        loading = true
-        try {
-            val response = ApiClient.api.getCompanies(search = debouncedQuery, sort = sortMode, page = currentPage)
-            companies = response.items
-            totalPages = response.pages
-            listState.scrollToItem(0)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.e("ErthiScan", "Failed to load companies", e)
-        }
-        loading = false
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colorScheme.background)
-            .systemBarsPadding()
-    ) {
-        Text(
-            text = "Companies",
-            color = colorScheme.onBackground,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-        )
-
-        Box(
+    Box(modifier = modifier.fillMaxSize().background(colorScheme.background)) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(colorScheme.surfaceContainerHigh)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = contentPadding.calculateTopPadding())
         ) {
-            if (searchQuery.isEmpty()) {
-                Text(
-                    text = "Search companies...",
-                    color = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    fontSize = 16.sp
-                )
-            }
-            BasicTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                textStyle = TextStyle(
-                    color = colorScheme.onSurface,
-                    fontSize = 16.sp
-                ),
-                cursorBrush = SolidColor(colorScheme.primary),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+            Text(
+                stringResource(R.string.companies_title),
+                color = colorScheme.onBackground,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
             )
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            SortChip("Reports", "reports_desc", sortMode) { sortMode = it; currentPage = 1 }
-            SortChip("Score ↓", "score_desc", sortMode) { sortMode = it; currentPage = 1 }
-            SortChip("Score ↑", "score_asc", sortMode) { sortMode = it; currentPage = 1 }
-            SortChip("A → Z", "name_asc", sortMode) { sortMode = it; currentPage = 1 }
-            SortChip("Z → A", "name_desc", sortMode) { sortMode = it; currentPage = 1 }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (loading && companies.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                Text("Loading...", color = colorScheme.onSurfaceVariant)
-            }
-        } else if (!loading && companies.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No companies found",
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 16.sp
+                if (state.query.isEmpty()) {
+                    Text(stringResource(R.string.search_companies_hint), color = colorScheme.onSurfaceVariant.copy(alpha = 0.5f), fontSize = 16.sp)
+                }
+                BasicTextField(
+                    value = state.query,
+                    onValueChange = vm::onQueryChange,
+                    textStyle = TextStyle(color = colorScheme.onSurface, fontSize = 16.sp),
+                    cursorBrush = SolidColor(colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
                 )
             }
-        } else {
-            LazyColumn(
-                state = listState,
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(companies, key = { it.id }) { company ->
-                    CompanyRow(company, onClick = { onCompanyClick(company.id) })
+                listOf(
+                    stringResource(R.string.sort_reports) to "reports_desc",
+                    stringResource(R.string.sort_score_desc) to "score_desc",
+                    stringResource(R.string.sort_score_asc) to "score_asc",
+                    stringResource(R.string.sort_name_asc) to "name_asc",
+                    stringResource(R.string.sort_name_desc) to "name_desc",
+                ).forEach { (label, value) ->
+                    SortChip(label, value, state.sort) { vm.onSortChange(it) }
                 }
+            }
 
-                if (totalPages > 1) {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (currentPage > 1) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(colorScheme.surfaceContainerHigh)
-                                        .clickable { currentPage-- }
-                                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                                ) {
-                                    Text("←", color = colorScheme.onSurface, fontSize = 16.sp)
+            Spacer(Modifier.height(8.dp))
+
+            if (state.loading && state.companies.isEmpty()) {
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.loading), color = colorScheme.onSurfaceVariant)
+                }
+            } else if (!state.loading && state.companies.isEmpty()) {
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.no_companies_found), color = colorScheme.onSurfaceVariant, fontSize = 16.sp)
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 16.dp)
+                ) {
+                    items(state.companies, key = { it.id }) { company ->
+                        CompanyRow(company) { onCompanyClick(company.id) }
+                    }
+
+                    if (state.pages > 1) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (state.page > 1) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(colorScheme.surfaceContainerHigh)
+                                            .clickable { vm.prevPage() }
+                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    ) { Text(stringResource(R.string.previous_page), color = colorScheme.onSurface, fontSize = 16.sp) }
                                 }
-                            }
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Text(
-                                text = "$currentPage / $totalPages",
-                                color = colorScheme.onSurfaceVariant,
-                                fontSize = 14.sp
-                            )
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            if (currentPage < totalPages) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(colorScheme.surfaceContainerHigh)
-                                        .clickable { currentPage++ }
-                                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                                ) {
-                                    Text("→", color = colorScheme.onSurface, fontSize = 16.sp)
+                                Spacer(Modifier.width(16.dp))
+                                Text(stringResource(R.string.page_indicator, state.page, state.pages), color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                                Spacer(Modifier.width(16.dp))
+                                if (state.page < state.pages) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(colorScheme.surfaceContainerHigh)
+                                            .clickable { vm.nextPage() }
+                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    ) { Text(stringResource(R.string.next_page), color = colorScheme.onSurface, fontSize = 16.sp) }
                                 }
                             }
                         }
                     }
+                    item { Spacer(Modifier.height(16.dp)) }
                 }
-
-                item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+                .padding(bottom = contentPadding.calculateBottomPadding())
+        )
     }
 }
 
 @Composable
-private fun SortChip(label: String, value: String, current: String, onSelect: (String) -> Unit) {
+fun SortChip(label: String, value: String, current: String, onSelect: (String) -> Unit) {
     val colorScheme = MaterialTheme.colorScheme
     val selected = value == current
 
@@ -251,7 +201,7 @@ private fun SortChip(label: String, value: String, current: String, onSelect: (S
 }
 
 @Composable
-private fun CompanyRow(company: CompanyItem, onClick: () -> Unit) {
+fun CompanyRow(company: CompanyItem, onClick: () -> Unit) {
     val colorScheme = MaterialTheme.colorScheme
 
     Row(
@@ -271,7 +221,7 @@ private fun CompanyRow(company: CompanyItem, onClick: () -> Unit) {
                 fontWeight = FontWeight.Medium
             )
             Text(
-                text = "${company.reportCount} reports",
+                text = androidx.compose.ui.res.pluralStringResource(R.plurals.reports_count, company.reportCount, company.reportCount),
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
@@ -295,7 +245,7 @@ private fun CompanyRow(company: CompanyItem, onClick: () -> Unit) {
             )
         } else {
             Text(
-                text = "—",
+                text = stringResource(R.string.score_dash),
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 20.sp
             )

@@ -7,24 +7,26 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceRequest
 import androidx.camera.lifecycle.ProcessCameraProvider
+import kotlinx.coroutines.guava.await
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
+import java.util.concurrent.Executors
 
 @Composable
 fun CameraPreview(torchEnabled: Boolean = false, onBarcodeScanned: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val executor = remember { ContextCompat.getMainExecutor(context) }
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     val scanner = remember { BarcodeScanning.getClient() }
 
     var candidateValue by remember { mutableStateOf<String?>(null) }
-    var candidateCount by remember { mutableStateOf(0) }
+    var candidateCount by remember { mutableIntStateOf(0) }
     var confirmedValue by remember { mutableStateOf<String?>(null) }
     var surfaceRequest by remember { mutableStateOf<SurfaceRequest?>(null) }
     var camera by remember { mutableStateOf<Camera?>(null) }
@@ -41,7 +43,7 @@ fun CameraPreview(torchEnabled: Boolean = false, onBarcodeScanned: (String) -> U
         ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build().apply {
-                setAnalyzer(executor) { imageProxy ->
+                setAnalyzer(analysisExecutor) { imageProxy ->
                     val mediaImage = imageProxy.image
                     if (mediaImage == null) {
                         imageProxy.close()
@@ -82,15 +84,27 @@ fun CameraPreview(torchEnabled: Boolean = false, onBarcodeScanned: (String) -> U
             }
     }
 
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
     LaunchedEffect(Unit) {
-        val cameraProvider = ProcessCameraProvider.getInstance(context).get()
-        cameraProvider.unbindAll()
-        camera = cameraProvider.bindToLifecycle(
+        val provider = ProcessCameraProvider.getInstance(context).await()
+        provider.unbindAll()
+        camera = provider.bindToLifecycle(
             lifecycleOwner,
             CameraSelector.DEFAULT_BACK_CAMERA,
             preview,
             imageAnalysis
         )
+        cameraProvider = provider
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraProvider?.unbindAll()
+            imageAnalysis.clearAnalyzer()
+            analysisExecutor.shutdown()
+            scanner.close()
+        }
     }
 
     LaunchedEffect(torchEnabled) {

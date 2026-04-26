@@ -1,86 +1,72 @@
 package io.erthiscan.scan
 
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.ui.unit.lerp
-import android.os.VibrationEffect
-import android.os.VibratorManager
-import android.util.Log
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.outlined.FlashlightOn
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.foundation.clickable
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.runtime.remember
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
-import io.erthiscan.api.ApiClient
-import io.erthiscan.api.ScanBarcodeRequest
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.erthiscan.R
 import io.erthiscan.api.ScanResponse
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import retrofit2.HttpException
+import io.erthiscan.util.vibrateShort
 
 @Composable
-fun ScanScreen(onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> }) {
-    var isTorchOn by remember { mutableStateOf(false) }
-    var scannedBarcode by remember { mutableStateOf<String?>(null) }
-    var scanResult by remember { mutableStateOf<ScanResponse?>(null) }
-    var notFoundBarcode by remember { mutableStateOf<String?>(null) }
-    val vibrator = (LocalContext.current.getSystemService(VibratorManager::class.java))
-        .defaultVibrator
+fun ScanScreen(
+    onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> },
+    innerPadding: PaddingValues = PaddingValues(0.dp),
+    vm: ScanViewModel = hiltViewModel()
+) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val screenMin = min(maxWidth, maxHeight)
-        val outerButton = (screenMin * 0.18f).coerceIn(50.dp, 77.dp)
-        val innerButton = outerButton * 0.82f
-        val iconSize = outerButton * 0.47f
+    LaunchedEffect(state.error) {
+        state.error?.let {
+            snackbarHostState.showSnackbar(it.asString(context))
+            vm.dismissError()
+        }
+    }
 
-        CameraPreview(torchEnabled = isTorchOn) { barcode ->
-            Log.d("ErthiScan", "Scanned: $barcode")
-            scannedBarcode = barcode
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        CameraPreview(torchEnabled = state.torch) { barcode ->
+            vm.onBarcode(barcode)
         }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .systemBarsPadding(),
+                .padding(innerPadding)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .consumeWindowInsets(innerPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
@@ -88,7 +74,7 @@ fun ScanScreen(onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> }) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Scan Barcode",
+                    text = stringResource(R.string.scan_barcode),
                     color = Color.White,
                     fontSize = 20.sp
                 )
@@ -99,15 +85,22 @@ fun ScanScreen(onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> }) {
                 contentAlignment = Alignment.Center
             ) {
                 val frameSize = (min(maxWidth, maxHeight) * 0.8f).coerceAtMost(400.dp)
-                ViewfinderOverlay(
-                    modifier = Modifier.size(frameSize)
-                )
+                ViewfinderOverlay(modifier = Modifier.size(frameSize))
             }
 
             Box(
-                modifier = Modifier.weight(0.8f).fillMaxWidth(),
+                modifier = Modifier.weight(1.2f).fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
+                val windowInfo = LocalWindowInfo.current
+                val density = LocalDensity.current
+                val screenMin = with(density) {
+                    min(windowInfo.containerSize.width.toDp(), windowInfo.containerSize.height.toDp())
+                }
+                val outerButton = (screenMin * 0.18f).coerceIn(50.dp, 77.dp)
+                val innerButton = outerButton * 0.82f
+                val iconSize = outerButton * 0.47f
+
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
@@ -117,8 +110,8 @@ fun ScanScreen(onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> }) {
                 ) {
                     FilledIconButton(
                         onClick = {
-                            vibrator.vibrate(VibrationEffect.createOneShot(30, 50))
-                            isTorchOn = !isTorchOn
+                            context.vibrateShort()
+                            vm.toggleTorch()
                         },
                         modifier = Modifier.size(innerButton),
                         shape = CircleShape,
@@ -127,57 +120,31 @@ fun ScanScreen(onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> }) {
                             contentColor = Color.DarkGray
                         )
                     ) {
-                        Crossfade(targetState = isTorchOn) { torchOn ->
+                        Crossfade(targetState = state.torch, label = "torch") { torchOn ->
                             Icon(
                                 imageVector = if (torchOn) Icons.Filled.FlashlightOn else Icons.Outlined.FlashlightOn,
-                                contentDescription = "Toggle flashlight",
+                                contentDescription = stringResource(R.string.toggle_flashlight),
                                 modifier = Modifier.size(iconSize)
                             )
                         }
                     }
                 }
             }
-
-            // Space for tab bar overlay
-            Box(modifier = Modifier.weight(0.4f).fillMaxWidth())
         }
 
-        scannedBarcode?.let { barcode ->
-            LaunchedEffect(barcode) {
-                try {
-                    scanResult = ApiClient.api.scanBarcode(ScanBarcodeRequest(barcode))
-                } catch (e: HttpException) {
-                    Log.e("ErthiScan", "API error ${e.code()}", e)
-                    if (e.code() == 404) {
-                        val detail = runCatching {
-                            e.response()?.errorBody()?.string()?.let {
-                                kotlinx.serialization.json.Json.parseToJsonElement(it)
-                                    .jsonObject["detail"]?.jsonPrimitive?.contentOrNull
-                            }
-                        }.getOrNull()
-                        if (detail == "product not found") {
-                            notFoundBarcode = barcode
-                        }
-                    }
-                    scanResult = null
-                } catch (e: Exception) {
-                    Log.e("ErthiScan", "API error", e)
-                    scanResult = null
-                }
-            }
-        }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(innerPadding)
+        )
 
-        notFoundBarcode?.let { barcode ->
+        state.notFoundBarcode?.let { barcode ->
             ProductNotFoundSheet(
                 barcode = barcode,
-                onDismiss = {
-                    notFoundBarcode = null
-                    scannedBarcode = null
-                }
+                onDismiss = vm::dismissNotFound
             )
         }
 
-        scanResult?.let { result ->
+        state.result?.let { result ->
             ProductSheet(
                 productName = result.product.name,
                 companyName = result.company.name,
@@ -185,11 +152,7 @@ fun ScanScreen(onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> }) {
                 ethicalScore = result.company.ethicalScore,
                 hasReports = result.company.reportCount > 0,
                 openFactsUrl = result.product.openFactsUrl,
-                barcode = result.product.barcode,
-                onDismiss = {
-                    scannedBarcode = null
-                    scanResult = null
-                },
+                onDismiss = vm::dismissResult,
                 onViewCompany = { companyId -> onViewCompany(result, companyId) }
             )
         }
@@ -198,20 +161,19 @@ fun ScanScreen(onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> }) {
 
 @Composable
 fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
-    val tabs = listOf("Companies", "Scan", "Profile")
-    val tabWidths = listOf(110.dp, 80.dp, 80.dp)
-    val animationProgress by animateFloatAsState(
-        targetValue = selectedTab.toFloat(),
-        animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
+    val tabs = listOf(
+        stringResource(R.string.tab_companies),
+        stringResource(R.string.tab_scan),
+        stringResource(R.string.tab_profile),
     )
-    val indicatorOffset = when {
-        animationProgress <= 1f -> lerp(0.dp, tabWidths[0], animationProgress)
-        else -> tabWidths[0] + lerp(0.dp, tabWidths[1], animationProgress - 1f)
-    }
-    val indicatorWidth = when {
-        animationProgress <= 1f -> lerp(tabWidths[0], tabWidths[1], animationProgress)
-        else -> lerp(tabWidths[1], tabWidths[2], animationProgress - 1f)
-    }
+    val tabWidth = 100.dp
+
+    val indicatorOffset by animateDpAsState(
+        targetValue = tabWidth * selectedTab,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        label = "TabIndicator"
+    )
+    val density = LocalDensity.current
 
     val colorScheme = MaterialTheme.colorScheme
 
@@ -223,8 +185,8 @@ fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     ) {
         Box(
             modifier = Modifier
-                .offset(x = indicatorOffset)
-                .width(indicatorWidth)
+                .offset { IntOffset(with(density) { indicatorOffset.roundToPx() }, 0) }
+                .width(tabWidth)
                 .height(32.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(colorScheme.primaryContainer)
@@ -235,7 +197,7 @@ fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .width(tabWidths[index])
+                        .width(tabWidth)
                         .height(32.dp)
                         .clip(RoundedCornerShape(20.dp))
                         .clickable(
