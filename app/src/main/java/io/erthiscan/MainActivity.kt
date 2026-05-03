@@ -26,26 +26,40 @@ import androidx.compose.material3.MaterialTheme
 import io.erthiscan.ui.ErthiScanTheme
 import io.erthiscan.nav.Route
 
+/**
+ * MAIN ACTIVITY: The sole entry point for the Erthiscan UI.
+ * 
+ * ARCHITECTURAL ROLE:
+ * 1. HILT (@AndroidEntryPoint): Injects dependencies into this Activity.
+ * 2. NAVIGATION: Orchestrates initial routing based on intents.
+ * 3. PERMISSIONS: Hosts the Camera permission gate.
+ */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // EDGE-TO-EDGE: Enables the app to draw behind system bars.
         enableEdgeToEdge()
 
+        // DEEP LINK PARSING: Extract company ID if launched via App Link.
         val deepLinkCompanyId = parseDeepLinkCompanyId(intent)
 
         setContent {
+            // VIEW MODEL: Manages startup session restoration.
             val vm: StartupViewModel = hiltViewModel()
             val restored by vm.isRestored.collectAsStateWithLifecycle()
 
             ErthiScanTheme {
                 Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     if (restored) {
+                        // START ROUTE: Jump to company view if deep link exists.
                         val startRoute = deepLinkCompanyId?.let {
                             Route.Company(companyId = it)
                         }
+                        // PERMISSION GATE: Block UI until camera access is granted.
                         RequireCameraPermissionGate { MainScreen(startRoute = startRoute) }
                     } else {
+                        // STARTUP LOADING: Black screen while restoring session.
                         Box(Modifier.fillMaxSize().background(Color.Black))
                     }
                 }
@@ -55,11 +69,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Re-set the intent so deep links opened while activity is running are handled
+        // RE-SET INTENT: Required so that deep links opened while activity is running are handled.
         setIntent(intent)
     }
 }
 
+/**
+ * PARSE DEEP LINK: Extracts '/company/{id}' from 'pjdth.xyz'.
+ */
 private fun parseDeepLinkCompanyId(intent: Intent?): Int? {
     val uri = intent?.data ?: return null
     if (uri.host != "pjdth.xyz") return null
@@ -70,17 +87,25 @@ private fun parseDeepLinkCompanyId(intent: Intent?): Int? {
     return null
 }
 
+/**
+ * REQUIRE CAMERA PERMISSION GATE: Suspends rendering until camera permission is granted.
+ */
 @Composable
 private fun RequireCameraPermissionGate(content: @Composable () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // PERMISSION STATE: Checked synchronously.
     var granted by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         )
     }
+
+    // CONTRACT: Modern approach to request permissions.
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
 
+    // RESUME OBSERVER: Detect permission changes when returning from system settings.
     DisposableEffect(lifecycleOwner) {
         val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -91,9 +116,10 @@ private fun RequireCameraPermissionGate(content: @Composable () -> Unit) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
 
+    // TRIGGER: Auto-launch request if not granted.
     LaunchedEffect(Unit) { if (!granted) launcher.launch(Manifest.permission.CAMERA) }
 
-    // This Box holds the camera/main content and should also be full screen
+    // RENDER CONTENT: Holds the camera/main content.
     Box(modifier = Modifier.fillMaxSize()) {
         if (granted) content()
     }

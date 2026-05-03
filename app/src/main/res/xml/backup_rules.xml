@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    The full-backup-content element defines the rules for the Android Auto Backup feature.
+    This feature automatically backs up app data to a user's Google Drive.
+-->
 <full-backup-content>
+    <!-- 
+        exclude: Explicitly prevents specific files or directories from being included in the backup.
+        domain="sharedpref": Specifies the data domain as SharedPreferences.
+        path="auth_prefs.xml": Identifies the specific file containing sensitive authentication data.
+        WHY: Authentication tokens and sensitive session data should never be backed up to the cloud 
+        to prevent security breaches and ensure tokens are not leaked across devices/restores.
+    -->
     <exclude domain="sharedpref" path="auth_prefs.xml" />
 </full-backup-content>

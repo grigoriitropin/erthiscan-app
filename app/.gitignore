@@ -1,1 +1,2 @@
+# MODULE BUILD ARTIFACTS: Exclude generated files for the 'app' module.
 /build

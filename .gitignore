@@ -1,3 +1,7 @@
+# --- ANDROID & KOTLIN IGNORE PATTERNS ---
+
+# IDE SPECIFIC: Exclude IntelliJ/Android Studio internal project files.
+# We only track common settings, not user-specific layouts or caches.
 *.iml
 .gradle
 /local.properties
@@ -7,17 +11,27 @@
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
-/.idea/compiler.xml                                                                                                                                                                                            
+/.idea/compiler.xml
 /.idea/AndroidProjectSystem.xml
 /.idea/vcs.xml
 /.idea/deploymentTargetSelector.xml
+/.idea/deviceManager.xml
 /.idea/inspectionProfiles
 /.idea/.name
 /.idea/codeStyles/
+
+# SYSTEM FILES
 .DS_Store
+
+# BUILD ARTIFACTS: Exclude generated files and compiled code.
 /build
 /captures
 .externalNativeBuild
 .cxx
+
+# SECRETS: local.properties contains sensitive API keys and keystore paths. 
+# It MUST NEVER be committed to the repository.
 local.properties
+
+# RELEASE: Exclude final signed APKs and bundles.
 app/release/

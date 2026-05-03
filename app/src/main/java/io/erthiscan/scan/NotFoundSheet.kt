@@ -30,12 +30,27 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import io.erthiscan.R
 
+/**
+ * PRODUCT NOT FOUND SHEET: A fallback UI for unrecognized barcodes.
+ * 
+ * ARCHITECTURAL ROLE:
+ * When the ErthiScan backend fails to identify a barcode (404), this sheet 
+ * is displayed to guide the user towards external contribution.
+ * 
+ * KEY FEATURES:
+ * 1. DATA TRANSPARENCY: Displays the raw barcode value that wasn't found.
+ * 2. CROWDSOURCING LOOP: Encourages users to add the product to Open Food Facts (OFF), 
+ *    which serves as one of our data sources.
+ * 3. DEEP LINKING: Attempts to open the Google Play Store directly to the OFF app 
+ *    with a web fallback.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductNotFoundSheet(
     barcode: String,
     onDismiss: () -> Unit
 ) {
+    // STATE: Standard M3 bottom sheet state with non-persistent behavior.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val colorScheme = MaterialTheme.colorScheme
     val context = LocalContext.current
@@ -52,6 +67,7 @@ fun ProductNotFoundSheet(
                 .padding(bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // HEADER SECTION: Informs the user of the missing data.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -67,6 +83,7 @@ fun ProductNotFoundSheet(
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                // DISPLAY: Shows the barcode so the user can verify they scanned correctly.
                 Text(
                     text = barcode,
                     color = colorScheme.onSurfaceVariant,
@@ -77,6 +94,7 @@ fun ProductNotFoundSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // EXPLANATION SECTION: Contextualizes why OFF is the recommended platform.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -102,12 +120,15 @@ fun ProductNotFoundSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // CTA BUTTON: External navigation logic.
             Button(
                 onClick = {
                     val pkg = "org.openfoodfacts.scanner"
                     try {
+                        // MARKET SCHEME: Attempts to open the Play Store app.
                         context.startActivity(Intent(Intent.ACTION_VIEW, "market://details?id=$pkg".toUri()))
                     } catch (_: Exception) {
+                        // FALLBACK: Opens the browser if Play Store isn't available or fails.
                         context.startActivity(Intent(Intent.ACTION_VIEW, "https://play.google.com/store/apps/details?id=$pkg".toUri()))
                     }
                 },

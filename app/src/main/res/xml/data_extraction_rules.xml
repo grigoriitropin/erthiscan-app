@@ -1,9 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    The data-extraction-rules element provides granular control over how app data is extracted 
+    via different mechanisms (Cloud Backup and Device Transfer) starting from Android 12 (API 31).
+-->
 <data-extraction-rules>
+    <!-- 
+        cloud-backup: Defines rules specifically for backups to cloud services (e.g., Google Drive).
+    -->
     <cloud-backup>
+        <!-- 
+            exclude: Removes sensitive files from the cloud backup stream.
+            domain="sharedpref": Targets the SharedPreferences storage area.
+            path="auth_prefs.xml": The file holding sensitive authentication credentials.
+            WHY: To maintain security and privacy, preventing persistent login sessions from 
+            being stored on Google's servers.
+        -->
         <exclude domain="sharedpref" path="auth_prefs.xml" />
     </cloud-backup>
+    <!-- 
+        device-transfer: Defines rules for direct device-to-device transfers (e.g., via cable or local Wi-Fi).
+    -->
     <device-transfer>
+        <!-- 
+            exclude: Prevents specific files from being transferred to a new device during migration.
+            domain="sharedpref": Targets SharedPreferences.
+            path="auth_prefs.xml": The authentication preferences file.
+            WHY: Ensuring that even during a direct transfer, security-sensitive tokens must be 
+            re-acquired on the new device, preventing potential replay attacks or unauthorized access.
+        -->
         <exclude domain="sharedpref" path="auth_prefs.xml" />
     </device-transfer>
 </data-extraction-rules>

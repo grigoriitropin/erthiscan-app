@@ -36,6 +36,14 @@ import io.erthiscan.company.page.ConfirmDeleteDialog
 import io.erthiscan.company.page.DeleteChip
 import io.erthiscan.company.page.EditChip
 
+/**
+ * PROFILE SCREEN
+ * 
+ * ARCHITECTURAL ROLE:
+ * This screen serves as the user's personal hub. It handles the duality of:
+ * 1. UNAUTHENTICATED STATE: Prompting for Google Sign-In.
+ * 2. AUTHENTICATED STATE: Showing contributions, stats, and account settings.
+ */
 @Composable
 fun ProfileScreen(
     onShowReports: () -> Unit,
@@ -49,10 +57,13 @@ fun ProfileScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
+    // DATA SYNC: Automatically fetches the latest user profile and contribution counts 
+    // whenever the screen is accessed while logged in.
     LaunchedEffect(Unit) {
         if (ui.auth.isLoggedIn) vm.refresh()
     }
 
+    // ERROR OBSERVATION: Displays transient network or authentication failures.
     LaunchedEffect(ui.error) {
         ui.error?.let {
             snackbarHostState.showSnackbar(it.asString(context))
@@ -63,6 +74,7 @@ fun ProfileScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        // INSET HANDLING: Uses custom padding calculation to avoid overlapping with bottom navigation.
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Box(
@@ -77,6 +89,7 @@ fun ProfileScreen(
                 )
                 .consumeWindowInsets(padding)
         ) {
+            // STATE-DRIVEN UI: Swaps the entire screen content based on login status.
             if (ui.auth.isLoggedIn) {
                 LoggedInProfile(
                     onShowReports = onShowReports,
@@ -91,6 +104,9 @@ fun ProfileScreen(
     }
 }
 
+/**
+ * LOGGED IN PROFILE: The main dashboard for authenticated users.
+ */
 @Composable
 private fun LoggedInProfile(
     onShowReports: () -> Unit,
@@ -108,6 +124,7 @@ private fun LoggedInProfile(
     ) {
         Spacer(modifier = Modifier.weight(1f))
 
+        // IDENTITY: Displays the username from the latest profile sync or cached auth state.
         Text(
             text = ui.profile?.username ?: ui.auth.username ?: "",
             color = colorScheme.onBackground,
@@ -115,6 +132,7 @@ private fun LoggedInProfile(
             fontWeight = FontWeight.Bold
         )
 
+        // CONTRIBUTION STATS: Shows total impact using plural resources for localization.
         if (ui.profile != null) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -126,6 +144,7 @@ private fun LoggedInProfile(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // NAVIGATION: Links to detailed history views.
         Button(
             onClick = onShowReports,
             modifier = Modifier.fillMaxWidth(),
@@ -162,6 +181,7 @@ private fun LoggedInProfile(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // SIGNOUT: Uses a high-contrast 'Error' color scheme to indicate a destructive action.
         Button(
             onClick = onLogout,
             modifier = Modifier.fillMaxWidth(),
@@ -182,6 +202,10 @@ private fun LoggedInProfile(
     }
 }
 
+/**
+ * MY REPORTS SCREEN: A historical list of every primary claim made by the user.
+ * Provides deep-linking back to the specific company page and in-place editing.
+ */
 @Composable
 fun MyReportsScreen(
     onBack: () -> Unit,
@@ -195,6 +219,7 @@ fun MyReportsScreen(
 
     LaunchedEffect(Unit) { vm.refresh() }
 
+    // DELETE CONFIRMATION: Prevents accidental removal of contributions.
     if (deletingReport != null) {
         ConfirmDeleteDialog(
             text = stringResource(R.string.delete_report_confirmation),
@@ -228,26 +253,18 @@ fun MyReportsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
             )
 
+            // LOADING & EMPTY STATES
             if (ui.loading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.loading), color = colorScheme.onSurfaceVariant)
                 }
             } else if (ui.profile?.reports?.isEmpty() != false) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.no_reports_yet), color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
@@ -257,6 +274,7 @@ fun MyReportsScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(colorScheme.surfaceContainerHigh)
+                                // DEEP LINK: Navigates to CompanyPage and auto-scrolls to this report.
                                 .clickable { onCompanyClick(report.companyId, report.id) }
                                 .padding(16.dp)
                         ) {
@@ -271,6 +289,7 @@ fun MyReportsScreen(
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium
                                 )
+                                // VOTE FEEDBACK: Colors the score green (positive) or red (negative).
                                 val voteColor = when {
                                     report.voteSum > 0 -> Color(0xFF43A047)
                                     report.voteSum < 0 -> Color(0xFFE53935)
@@ -294,6 +313,7 @@ fun MyReportsScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
+                            // ACTIONS: Reuses chips from the main Company view for consistency.
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 EditChip(onClick = { onEdit(report) })
                                 DeleteChip(onClick = { deletingReport = report })
@@ -307,6 +327,9 @@ fun MyReportsScreen(
     }
 }
 
+/**
+ * MY CHALLENGES SCREEN: Similar to reports, but tracks nested counter-claims.
+ */
 @Composable
 fun MyChallengesScreen(
     onBack: () -> Unit,
@@ -354,25 +377,16 @@ fun MyChallengesScreen(
             )
 
             if (ui.loading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.loading), color = colorScheme.onSurfaceVariant)
                 }
             } else if (ui.profile?.challenges?.isEmpty() != false) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.no_challenges_yet), color = colorScheme.onSurfaceVariant, fontSize = 14.sp)
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
@@ -432,6 +446,10 @@ fun MyChallengesScreen(
     }
 }
 
+/**
+ * SIGN IN SCREEN: Powered by Android's modern [CredentialManager].
+ * It facilitates a seamless Google One Tap login experience.
+ */
 @Composable
 private fun SignInScreen(onGoogleIdToken: (String) -> Unit) {
     val colorScheme = MaterialTheme.colorScheme
@@ -440,9 +458,7 @@ private fun SignInScreen(onGoogleIdToken: (String) -> Unit) {
     val scope = rememberCoroutineScope()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -463,27 +479,34 @@ private fun SignInScreen(onGoogleIdToken: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(48.dp))
 
+        // AUTH TRIGGER: Launches the system BottomSheet for Google Account selection.
         Button(
             onClick = {
                 scope.launch {
                     try {
                         val currentActivity = activity ?: return@launch
                         val credentialManager = CredentialManager.create(context)
+
+                        // CONFIG: Uses the server's Client ID to verify the token backend-side.
                         val googleIdOption = GetGoogleIdOption.Builder()
                             .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
-                            .setFilterByAuthorizedAccounts(false)
+                            .setFilterByAuthorizedAccounts(false) // Allows selecting any account.
                             .build()
+
                         val request = GetCredentialRequest.Builder()
                             .addCredentialOption(googleIdOption)
                             .build()
+
+                        // EXECUTION: Suspends until the user selects an account or cancels.
                         val result = credentialManager.getCredential(currentActivity, request)
                         val googleIdToken = GoogleIdTokenCredential.createFrom(result.credential.data)
-                        val idToken = googleIdToken.idToken
-                        onGoogleIdToken(idToken)
+
+                        // CALLBACK: Passes the JWT idToken to the ViewModel for backend verification.
+                        onGoogleIdToken(googleIdToken.idToken)
                     } catch (e: NoCredentialException) {
-                        Log.d("ErthiScan", "No credential found", e)
+                        Log.d("ErthiScan", "No account selected by user", e)
                     } catch (e: Exception) {
-                        Log.e("ErthiScan", "Sign in failed", e)
+                        Log.e("ErthiScan", "Credential Manager failed", e)
                     }
                 }
             },

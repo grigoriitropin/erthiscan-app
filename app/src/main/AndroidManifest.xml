@@ -1,12 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- ANDROID MANIFEST: The central configuration for the Android application system. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- PERMISSIONS -->
+    <!-- CAMERA: Mandatory for real-time barcode detection via MLKit. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    
+    <!-- INTERNET: Mandatory for Retrofit API calls to backend and Google Auth. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    
+    <!-- VIBRATE: Used to provide haptic feedback when a barcode is successfully scanned. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- APPLICATION ENTRY: Points to our custom Hilt-enabled Application class. 
+         Security: Backups disabled to protect sensitive session tokens. -->
     <application
         android:name=".ErthiscanApp"
         android:allowBackup="false"
@@ -18,15 +27,23 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Erthiscan">
+        
+        <!-- MAIN ACTIVITY: The single entry point for our Compose-based UI.
+             Screen locked to portrait for scanner stability.
+             adjustResize ensures keyboard pushes up the UI for forms. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize">
+            
+            <!-- LAUNCHER INTENT: Primary entry point from the app drawer. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            
+            <!-- APP LINKS (DEEP LINKING): autoVerify requests OS to verify ownership. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
