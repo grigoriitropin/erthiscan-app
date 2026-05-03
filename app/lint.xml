@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- LINT CONFIGURATION: Customizes static analysis rules for the project. -->
 <lint>
+    <!-- 
+      UNSAFE OPT-IN USAGE ERROR: 
+      We explicitly suppress this warning for 'androidx.camera.core.ExperimentalGetImage'.
+      Our MLKit barcode analyzer requires raw, low-level access to the camera's 
+      ImageProxy frames to perform high-speed detection, which is gated behind 
+      this @Experimental API in CameraX.
+    -->
     <issue id="UnsafeOptInUsageError">
         <option name="opt-in" value="androidx.camera.core.ExperimentalGetImage" />
     </issue>

@@ -1,3 +1,4 @@
+<!-- IDE CONFIG: Primary shared run configuration for the 'app' module. -->
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="app" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">
     <module name="Erthiscan.app" />

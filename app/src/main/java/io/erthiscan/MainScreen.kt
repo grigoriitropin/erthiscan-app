@@ -43,6 +43,9 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 
+/**
+ * MAIN SCREEN: The root UI orchestrator for the application.
+ */
 @Composable
 fun MainScreen(startRoute: Route? = null) {
     val navController = rememberNavController()
@@ -50,12 +53,14 @@ fun MainScreen(startRoute: Route? = null) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
+    // DEEP LINK NAVIGATION
     LaunchedEffect(startRoute) {
         if (startRoute != null) {
             navController.navigate(startRoute)
         }
     }
 
+    // BOTTOM BAR VISIBILITY
     val showBottomBar = currentDestination?.let { dest ->
         dest.hasRoute<Route.Companies>() || 
         dest.hasRoute<Route.Scan>() || 

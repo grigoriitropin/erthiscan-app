@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    ADAPTIVE ICON: The standard entry point for modern Android launchers (API 26+).
+
+    COMPONENTS:
+    1. BACKGROUND: A static vector (ic_launcher_background) that remains stable 
+       during launcher animations.
+    2. FOREGROUND: The brand logo (ic_launcher_foreground) which can move 
+       independently to create a parallax effect.
+    3. MONOCHROME: A simplified version of the foreground for "Themed Icons" 
+       on Android 13+.
+-->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/ic_launcher_background"/>
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>

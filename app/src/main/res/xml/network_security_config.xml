@@ -1,21 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    The network-security-config element allows applications to customize their network security 
+    policy through a declarative configuration file. It simplifies SSL/TLS management.
+-->
 <network-security-config>
+    <!-- 
+        base-config: Defines the default security policy for all network connections.
+        cleartextTrafficPermitted="false": Enforces a strict HTTPS-only policy. 
+        WHY: This prevents the app from communicating over unencrypted channels, mitigating 
+        Man-in-the-Middle (MITM) attacks and data eavesdropping.
+    -->
     <base-config cleartextTrafficPermitted="false">
+        <!-- 
+            trust-anchors: Specifies the certificate authorities (CAs) that the app trusts.
+        -->
         <trust-anchors>
+            <!-- 
+                certificates src="system": Only trust certificates that are pre-installed by the OS.
+                WHY: This ensures the app only connects to servers with certificates verified 
+                by established, globally recognized authorities.
+            -->
             <certificates src="system" />
         </trust-anchors>
     </base-config>
 
+    <!-- 
+        domain-config: Provides specific overrides or configurations for particular domains.
+        cleartextTrafficPermitted="false": Again, enforces HTTPS for these specific domains.
+    -->
     <domain-config cleartextTrafficPermitted="false">
+        <!-- 
+            domain: The specific host to which this configuration applies.
+            includeSubdomains="true": Extends this configuration to all subdomains (e.g., api.pjdth.xyz).
+            WHY: To ensure consistent security across the entire infrastructure of the primary API provider.
+        -->
         <domain includeSubdomains="true">pjdth.xyz</domain>
         <trust-anchors>
+            <!-- 
+                certificates src="system": Maintains trust in system-level certificates for this domain.
+            -->
             <certificates src="system" />
         </trust-anchors>
     </domain-config>
 
+    <!-- 
+        debug-overrides: Allows modifications to the security policy specifically for debug builds.
+        This section is automatically ignored in release builds by the Android build system.
+    -->
     <debug-overrides>
         <trust-anchors>
+            <!-- 
+                certificates src="system": Still trusts system CAs.
+            -->
             <certificates src="system" />
+            <!-- 
+                certificates src="user": Allows the app to trust user-installed certificates.
+                WHY: Essential for debugging and traffic analysis tools like Charles Proxy or Fiddler, 
+                where the developer installs a local root CA to decrypt and inspect SSL traffic.
+            -->
             <certificates src="user" />
         </trust-anchors>
     </debug-overrides>

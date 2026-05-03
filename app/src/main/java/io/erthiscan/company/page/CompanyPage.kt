@@ -59,6 +59,19 @@ import io.erthiscan.api.ReportItem
 import io.erthiscan.api.SubReportItem
 import kotlin.math.roundToInt
 
+/**
+ * COMPANY PAGE: The detailed profile view for a specific company.
+ * 
+ * ARCHITECTURAL ROLE:
+ * This screen serves as the primary consumption point for ethical data. It renders 
+ * a hierarchical list of reports (claims) and their nested sub-reports (challenges).
+ * 
+ * KEY FEATURES:
+ * 1. DYNAMIC SCORING: Displays a normalized 0-100 score with a color-coded gauge.
+ * 2. NESTED REPORTING: Supports parent reports and expandable "Challenge" sub-lists.
+ * 3. DISPUTE DETECTION: Visually flags reports that have been heavily challenged.
+ * 4. AUTHENTICATED ACTIONS: Delegates voting, editing, and deletion to the [CompanyPageViewModel].
+ */
 @Composable
 fun CompanyPage(
     onBack: () -> Unit,
@@ -74,6 +87,7 @@ fun CompanyPage(
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // ERROR OBSERVATION: Shows transient network/logic errors via Snackbar.
     LaunchedEffect(state.error) {
         state.error?.let {
             snackbarHostState.showSnackbar(it.asString(context))
@@ -84,8 +98,10 @@ fun CompanyPage(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        // SYSTEM BARS: Ensures content correctly accounts for the status bar.
         contentWindowInsets = WindowInsets.systemBars
     ) { padding: PaddingValues ->
+        // LOADING / FAILURE STATE
         if (data == null) {
             Box(
                 modifier = Modifier
@@ -106,6 +122,7 @@ fun CompanyPage(
                 .padding(padding)
                 .consumeWindowInsets(padding)
         ) {
+            // HEADER: Company Name
             Text(
                 text = data.name,
                 color = colorScheme.onBackground,
@@ -118,20 +135,27 @@ fun CompanyPage(
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             )
 
+            // MAIN SCROLLABLE CONTENT: Uses LazyColumn for performance with large report lists.
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .weight(1f) // Takes up all available space between header and system bars.
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp) // Consistent spacing between cards.
             ) {
+                // SECTION: OVERVIEW
+                // Renders the visual score gauge and total report count.
                 item {
                     ScoreCard(data.ethicalScore, data.reportCount)
                 }
 
+                // SECTION: USER ACTIONS
+                // Provides a prominent button to start the report submission flow.
                 item {
                     Button(
+                        // CALLBACK: Triggered on click, passes current company name to the form 
+                        // to provide context for the user during report writing.
                         onClick = { onCreateReport(data.name) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
@@ -148,6 +172,7 @@ fun CompanyPage(
                     }
                 }
 
+                // SECTION HEADER: "Reports"
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -158,6 +183,8 @@ fun CompanyPage(
                     )
                 }
 
+                // CONDITIONAL LIST RENDERING: 
+                // If the list is empty, we show a friendly placeholder card instead of a blank screen.
                 if (data.reports.isEmpty()) {
                     item {
                         Box(
@@ -176,28 +203,47 @@ fun CompanyPage(
                         }
                     }
                 } else {
+                    // RENDERING INDIVIDUAL REPORTS:
+                    // Using 'key' optimization to ensure Smooth scrolling and efficient re-compositions 
+                    // when items are voted on or deleted.
                     items(data.reports, key = { it.id }) { report ->
                         ReportCardWithSubs(
                             report = report,
+                            // CHALLENGE CALLBACK: Navigates to CreateReportScreen with a parentId reference.
                             onChallenge = { onCreateChallenge(data.name, report.id) },
+                            // EDIT CALLBACK: 
+                            // 1. Extracts the primary source URL (firstOrNull) to pre-fill the form.
+                            // 2. Passes the report's text and company name to allow full context during editing.
                             onEdit = { onEditReport(report.id, report.text, report.sources.firstOrNull() ?: "", data.name) },
+                            // DELETE CALLBACK: Triggers the ViewModel's destructive API call.
                             onDelete = { vm.delete(report.id) },
+                            // VOTE CALLBACK: Delegates the integer value (1 or -1) to the ViewModel.
                             onVote = { reportId, value -> vm.vote(reportId, value) },
+                            // SUB-REPORT (CHALLENGE) EDIT:
+                            // Similar to primary reports, we pre-fill the form with the specific sub-report data.
                             onSubEdit = { sub ->
                                 onEditReport(sub.id, sub.text, sub.sources.firstOrNull() ?: "", data.name)
                             },
+                            // SUB-REPORT DELETE: Targeted deletion of a nested challenge.
                             onSubDelete = { sub -> vm.delete(sub.id) },
+                            // SUB-REPORT VOTE: Reactive voting on a specific challenge.
                             onSubVote = { subId, value -> vm.vote(subId, value) },
                         )
                     }
                 }
 
+                // BOTTOM PADDING: Ensures the last item isn't clipped by the screen edge.
                 item { Spacer(modifier = Modifier.height(16.dp)) }
             }
+
         }
     }
 }
 
+/**
+ * SCORE CARD: Visualizes the company's ethical standing.
+ * Maps the -100..100 raw score to a 0..100 display range.
+ */
 @Composable
 private fun ScoreCard(ethicalScore: Float, reportCount: Int) {
     val colorScheme = MaterialTheme.colorScheme
@@ -223,6 +269,7 @@ private fun ScoreCard(ethicalScore: Float, reportCount: Int) {
             val yellow = Color(0xFFFFB300)
             val green = Color(0xFF43A047)
             val t = displayScore / 100f
+            // COLOR INTERPOLATION: Shifts from Red to Yellow (0-50) and Yellow to Green (51-100).
             val scoreColor = if (t < 0.5f) lerp(red, yellow, t * 2f) else lerp(yellow, green, (t - 0.5f) * 2f)
 
             Text(
@@ -247,6 +294,14 @@ private fun ScoreCard(ethicalScore: Float, reportCount: Int) {
     }
 }
 
+/**
+ * REPORT CARD WITH SUBS: Renders a primary claim and its nested challenges.
+ * 
+ * DISPUTE LOGIC:
+ * A report is flagged with a red border if its total positive vote sum is 
+ * significantly challenged by valid (voted 'True') counter-claims.
+ * Heuristic: Disputed if (Challenges true_count sum) >= 70% of (Report vote_sum).
+ */
 @Composable
 private fun ReportCardWithSubs(
     report: ReportItem,
@@ -264,6 +319,7 @@ private fun ReportCardWithSubs(
     var expanded by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
+    // DISPUTE CALCULATION
     val voteSum = report.ethicalCount - report.unethicalCount
     val challengePenalty = report.subReports.sumOf { maxOf(0, it.trueCount - it.falseCount) }
     val isDisputed = voteSum > 0 && challengePenalty >= 0.7 * voteSum
@@ -286,6 +342,7 @@ private fun ReportCardWithSubs(
             .clip(RoundedCornerShape(16.dp))
             .background(colorScheme.surfaceContainerHigh)
     ) {
+        // DISPUTE INDICATOR: A vertical red stripe on the left edge.
         if (isDisputed) {
             Box(
                 modifier = Modifier
@@ -314,11 +371,13 @@ private fun ReportCardWithSubs(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = report.createdAt.take(10),
+                        text = report.createdAt.take(10), // Shows only YYYY-MM-DD
                         color = colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                 }
+                // EDIT/DELETE: Only rendered if the user has permission (handled by logic in the ViewModel 
+                // but the UI must provide the callbacks).
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     EditChip(onClick = onEdit)
                     DeleteChip(onClick = { showDeleteDialog = true })
@@ -333,6 +392,7 @@ private fun ReportCardWithSubs(
                 fontSize = 14.sp
             )
 
+            // SOURCES: Clickable underlines that open external browser links.
             if (report.sources.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 report.sources.forEach { source ->
@@ -353,6 +413,7 @@ private fun ReportCardWithSubs(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // VOTING BAR
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -375,6 +436,7 @@ private fun ReportCardWithSubs(
 
                 Spacer(modifier = Modifier.weight(1f))
 
+                // CHALLENGE BUTTON: Navigation trigger to CreateReportScreen with parentId.
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
@@ -389,30 +451,47 @@ private fun ReportCardWithSubs(
                 }
             }
 
+            // CHALLENGES SUB-LIST: Logic for rendering counter-claims (sub-reports).
+            // We only render this section if the backend actually returned child reports.
             if (report.subReports.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
+                
+                // TOGGLE BUTTON: A clickable area to expand/collapse the challenge list.
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { expanded = !expanded }
+                        .clip(RoundedCornerShape(12.dp)) // Rounds the click ripple for better aesthetics.
+                        .clickable { expanded = !expanded } // Reactively toggles the visibility state.
                         .padding(vertical = 4.dp)
                 ) {
+                    // DYNAMIC LABEL: Swaps text based on 'expanded' state and uses plural resources 
+                    // to handle "1 challenge" vs "5 challenges" correctly across locales.
                     Text(
-                         text = if (expanded) pluralStringResource(R.plurals.hide_challenges, report.subReports.size, report.subReports.size)
-                               else pluralStringResource(R.plurals.show_challenges, report.subReports.size, report.subReports.size),
-                        color = colorScheme.primary,
+                         text = if (expanded) {
+                             pluralStringResource(R.plurals.hide_challenges, report.subReports.size, report.subReports.size)
+                         } else {
+                             pluralStringResource(R.plurals.show_challenges, report.subReports.size, report.subReports.size)
+                         },
+                        color = colorScheme.primary, // Highlights the interactive element.
                         fontSize = 12.sp
                     )
                 }
 
+                // ANIMATED TRANSITION: Ensures the nested list doesn't "pop" in, 
+                // providing a much smoother user experience during expansion.
                 AnimatedVisibility(visible = expanded) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Spacer(modifier = Modifier.height(4.dp))
+                        
+                        // NESTED ITERATION: Renders each individual challenge.
                         report.subReports.forEach { sub ->
                             SubReportCard(
                                 sub = sub,
+                                // NESTED EDIT: Triggers the same top-level edit flow, pre-filling 
+                                // the form with sub-report specific data.
                                 onEdit = { onSubEdit(sub) },
+                                // NESTED DELETE: Triggers targeted deletion for this child report.
                                 onDelete = { onSubDelete(sub) },
+                                // NESTED VOTE: Allows users to verify or debunk the challenge claim.
                                 onVote = { subId, value -> onSubVote(subId, value) },
                             )
                         }
@@ -423,6 +502,9 @@ private fun ReportCardWithSubs(
     }
 }
 
+/**
+ * SUB REPORT CARD: A simplified card for nested challenges.
+ */
 @Composable
 private fun SubReportCard(
     sub: SubReportItem,
@@ -495,6 +577,7 @@ private fun SubReportCard(
 
         Spacer(modifier = Modifier.height(8.dp))
 
+        // SUB-REPORT VOTING: Simplified labels (True/False) instead of Ethical/Unethical.
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             VoteChip(
                  label = stringResource(R.string.true_label),
@@ -514,6 +597,9 @@ private fun SubReportCard(
     }
 }
 
+/**
+ * VOTE CHIP: Reusable component for voting buttons with selection state colors.
+ */
 @Composable
 private fun VoteChip(
     label: String,

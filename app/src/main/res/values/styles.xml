@@ -1,9 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    The resources root element encapsulates all resource definitions for the application.
+    It serves as a container for styles, colors, strings, and other UI-related attributes.
+-->
 <resources>
-    <!-- Base application theme for edge-to-edge -->
+    <!-- 
+        Theme.Erthiscan: The primary application theme definition.
+        'parent="android:Theme.Material.Light.NoActionBar"' specifies that this theme inherits from
+        the Material Light theme without a default ActionBar, enabling a full-screen, custom UI layout.
+        This is essential for modern edge-to-edge Android development where the app controls its own headers.
+    -->
     <style name="Theme.Erthiscan" parent="android:Theme.Material.Light.NoActionBar">
-        <!-- Transparent system bars for edge-to-edge -->
+        <!-- 
+            android:statusBarColor: Sets the color of the system status bar.
+            '@android:color/transparent' is used to allow the application layout to flow behind
+            the status bar, achieving an immersive 'edge-to-edge' visual effect.
+        -->
         <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- 
+            android:navigationBarColor: Sets the color of the system navigation bar (bottom bar).
+            '@android:color/transparent' ensures the app's background or content extends under
+            the navigation bar, maintaining visual consistency in modern gesture-based navigation.
+        -->
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 </resources>

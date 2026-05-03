@@ -39,6 +39,21 @@ import io.erthiscan.R
 import io.erthiscan.api.ScanResponse
 import io.erthiscan.util.vibrateShort
 
+/**
+ * SCAN SCREEN: The high-performance viewfinder and scanning interface.
+ * 
+ * ARCHITECTURAL ROLE:
+ * This is the primary interactive hub for the app's core feature: barcode scanning. 
+ * It coordinates the camera stream, UI overlays, and result modals.
+ * 
+ * KEY FEATURES:
+ * 1. REAL-TIME VIEWPORT: Renders the CameraX preview with a custom viewfinder overlay.
+ * 2. HAPTIC FEEDBACK: Provides tactile confirmation during torch toggles.
+ * 3. STATE-DRIVEN MODALS: Reactively shows "Not Found" or "Product Data" sheets 
+ *    based on the [ScanViewModel] state.
+ * 4. DYNAMIC ADAPTATION: Calculates button and viewfinder sizes based on screen 
+ *    dimensions to ensure usability across device form factors.
+ */
 @Composable
 fun ScanScreen(
     onViewCompany: (ScanResponse, Int) -> Unit = { _, _ -> },
@@ -49,6 +64,7 @@ fun ScanScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // ERROR CHANNEL: Displays transient network/API errors via Snackbar.
     LaunchedEffect(state.error) {
         state.error?.let {
             snackbarHostState.showSnackbar(it.asString(context))
@@ -57,10 +73,12 @@ fun ScanScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        // BACKGROUND: The live camera feed.
         CameraPreview(torchEnabled = state.torch) { barcode ->
             vm.onBarcode(barcode)
         }
 
+        // UI OVERLAY: Controls and instructions.
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -69,6 +87,7 @@ fun ScanScreen(
                 .consumeWindowInsets(innerPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // INSTRUCTIONAL TEXT: Positions at the top of the screen.
             Box(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -80,14 +99,17 @@ fun ScanScreen(
                 )
             }
 
+            // VIEWFINDER: The central framing area for the barcode.
             BoxWithConstraints(
                 modifier = Modifier.weight(3f).fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
+                // Adaptive sizing: Viewfinder takes 80% of the smallest screen dimension.
                 val frameSize = (min(maxWidth, maxHeight) * 0.8f).coerceAtMost(400.dp)
                 ViewfinderOverlay(modifier = Modifier.size(frameSize))
             }
 
+            // CONTROLS: Torch toggle with adaptive layout.
             Box(
                 modifier = Modifier.weight(1.2f).fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -97,6 +119,7 @@ fun ScanScreen(
                 val screenMin = with(density) {
                     min(windowInfo.containerSize.width.toDp(), windowInfo.containerSize.height.toDp())
                 }
+                // DYNAMIC SIZING: Buttons scale with screen width/height.
                 val outerButton = (screenMin * 0.18f).coerceIn(50.dp, 77.dp)
                 val innerButton = outerButton * 0.82f
                 val iconSize = outerButton * 0.47f
@@ -110,6 +133,7 @@ fun ScanScreen(
                 ) {
                     FilledIconButton(
                         onClick = {
+                            // HAPTICS: Confirms the press to the user.
                             context.vibrateShort()
                             vm.toggleTorch()
                         },
@@ -120,6 +144,7 @@ fun ScanScreen(
                             contentColor = Color.DarkGray
                         )
                     ) {
+                        // TRANSITION: Smoothly swaps icons when torch state changes.
                         Crossfade(targetState = state.torch, label = "torch") { torchOn ->
                             Icon(
                                 imageVector = if (torchOn) Icons.Filled.FlashlightOn else Icons.Outlined.FlashlightOn,
@@ -137,6 +162,7 @@ fun ScanScreen(
             modifier = Modifier.align(Alignment.BottomCenter).padding(innerPadding)
         )
 
+        // SHEET LOGIC: Triggered by state changes in the ViewModel.
         state.notFoundBarcode?.let { barcode ->
             ProductNotFoundSheet(
                 barcode = barcode,
@@ -159,6 +185,13 @@ fun ScanScreen(
     }
 }
 
+/**
+ * TAB BAR: A custom-designed navigation component.
+ * 
+ * ARCHITECTURAL ROLE:
+ * Replaces the standard BottomNavigation with a modern, pill-shaped design 
+ * that supports animated transitions between states.
+ */
 @Composable
 fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     val tabs = listOf(
@@ -168,13 +201,13 @@ fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     )
     val tabWidth = 100.dp
 
+    // ANIMATED INDICATOR: Smoothly slides the pill background to the selected tab.
     val indicatorOffset by animateDpAsState(
         targetValue = tabWidth * selectedTab,
         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "TabIndicator"
     )
     val density = LocalDensity.current
-
     val colorScheme = MaterialTheme.colorScheme
 
     Box(
@@ -183,6 +216,7 @@ fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
             .background(colorScheme.surfaceContainerHighest.copy(alpha = 0.85f))
             .padding(4.dp)
     ) {
+        // THE PILL: Moves behind the text.
         Box(
             modifier = Modifier
                 .offset { IntOffset(with(density) { indicatorOffset.roundToPx() }, 0) }
@@ -201,7 +235,7 @@ fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
                         .height(32.dp)
                         .clip(RoundedCornerShape(20.dp))
                         .clickable(
-                            indication = null,
+                            indication = null, // Disable ripple for a cleaner look.
                             interactionSource = remember { MutableInteractionSource() }
                         ) { onTabSelected(index) }
                 ) {
@@ -217,12 +251,20 @@ fun TabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     }
 }
 
+/**
+ * VIEWFINDER OVERLAY: A custom-drawn framing guide.
+ * 
+ * DESIGN RATIONALE:
+ * Uses Canvas to draw only the corners of a rectangle. This provides a clear 
+ * "hit area" for the user without cluttering the camera feed.
+ */
 @Composable
 fun ViewfinderOverlay(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
         val frameWidth = size.width
         val frameHeight = size.height
 
+        // CORNER DIMENSIONS: Calculated as a percentage of the total frame size.
         val cornerLength = frameWidth * 0.12f
         val cornerRadius = 5.dp.toPx()
         val strokeWidth = 3.dp.toPx()
@@ -230,6 +272,7 @@ fun ViewfinderOverlay(modifier: Modifier = Modifier) {
         val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round)
         val color = Color.White
 
+        // TOP-LEFT CORNER
         drawArc(
             color = color,
             startAngle = 180f,
@@ -242,6 +285,7 @@ fun ViewfinderOverlay(modifier: Modifier = Modifier) {
         drawLine(color, Offset(cornerRadius, 0f), Offset(cornerLength, 0f), strokeWidth)
         drawLine(color, Offset(0f, cornerRadius), Offset(0f, cornerLength), strokeWidth)
 
+        // TOP-RIGHT CORNER
         drawArc(
             color = color,
             startAngle = 270f,
@@ -254,6 +298,7 @@ fun ViewfinderOverlay(modifier: Modifier = Modifier) {
         drawLine(color, Offset(frameWidth - cornerLength, 0f), Offset(frameWidth - cornerRadius, 0f), strokeWidth)
         drawLine(color, Offset(frameWidth, cornerRadius), Offset(frameWidth, cornerLength), strokeWidth)
 
+        // BOTTOM-LEFT CORNER
         drawArc(
             color = color,
             startAngle = 90f,
@@ -266,6 +311,7 @@ fun ViewfinderOverlay(modifier: Modifier = Modifier) {
         drawLine(color, Offset(cornerRadius, frameHeight), Offset(cornerLength, frameHeight), strokeWidth)
         drawLine(color, Offset(0f, frameHeight - cornerLength), Offset(0f, frameHeight - cornerRadius), strokeWidth)
 
+        // BOTTOM-RIGHT CORNER
         drawArc(
             color = color,
             startAngle = 0f,

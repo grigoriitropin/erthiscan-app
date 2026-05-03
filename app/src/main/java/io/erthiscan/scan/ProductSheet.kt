@@ -32,6 +32,20 @@ import androidx.core.net.toUri
 import io.erthiscan.R
 import kotlin.math.roundToInt
 
+/**
+ * PRODUCT SHEET: The primary modal for recognized products.
+ * 
+ * ARCHITECTURAL ROLE:
+ * Provides an immediate high-level overview of a scanned product's ethical 
+ * standing. It acts as a gateway to the more detailed [CompanyPage].
+ * 
+ * KEY FEATURES:
+ * 1. SCORE GAUGE: Reuses the same color-interpolated scoring logic as the CompanyPage 
+ *    for visual consistency.
+ * 2. ENTITY MAPPING: Clearly distinguishes between the product name (e.g., "KitKat") 
+ *    and the parent company (e.g., "Nestlé").
+ * 3. TRANSPARENCY: Provides a direct link to the data source (e.g., Open Food Facts).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductSheet(
@@ -60,6 +74,7 @@ fun ProductSheet(
                 .padding(bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // SCORING SECTION: High-impact visual indicator.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -74,12 +89,16 @@ fun ProductSheet(
                     fontSize = 14.sp
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                
+                // DYNAMIC SCORING LOGIC:
+                // Normalizes the -100..100 raw score to a 0..100 display value.
                 if (hasReports) {
                     val displayScore = ((ethicalScore.coerceIn(-100f, 100f) + 100f) / 2f).roundToInt()
                     val red = Color(0xFFE53935)
                     val yellow = Color(0xFFFFB300)
                     val green = Color(0xFF43A047)
                     val t = displayScore / 100f
+                    // COLOR INTERPOLATION: Shifts red -> yellow -> green based on score.
                     val scoreColor = if (t < 0.5f) lerp(red, yellow, t * 2f) else lerp(yellow, green, (t - 0.5f) * 2f)
                     Text(
                         text = displayScore.toString(),
@@ -88,6 +107,7 @@ fun ProductSheet(
                         fontWeight = FontWeight.Bold
                     )
                 } else {
+                    // FALLBACK: Displays a dash if no reports (and thus no score) exist yet.
                     Text(
                         text = stringResource(R.string.score_dash),
                         color = colorScheme.onSurfaceVariant,
@@ -98,10 +118,12 @@ fun ProductSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // PRODUCT & COMPANY INFO: Dual-column layout for identifying the entity.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // PRODUCT COLUMN
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -115,6 +137,7 @@ fun ProductSheet(
                     Text(text = productName, color = colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 }
 
+                // COMPANY COLUMN
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -131,6 +154,7 @@ fun ProductSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // CTA: Navigation to full company details.
             Button(
                 onClick = {
                     onDismiss()
@@ -152,6 +176,7 @@ fun ProductSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // OPTIONAL SOURCE LINK: External link to verification data.
             if (openFactsUrl != null) {
                 Button(
                     onClick = {

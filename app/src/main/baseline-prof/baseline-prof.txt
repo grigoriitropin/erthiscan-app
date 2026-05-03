@@ -1,6 +1,10 @@
-# Baseline Profile for Erthiscan
-# Auto-generated startup profile — regenerate via Macrobenchmark before release
-# Startup
+# BASELINE PROFILE: PERFORMANCE OPTIMIZATION
+# This file provides a list of critical classes and methods to the Android Runtime (ART).
+# ART pre-compiles these entries on the device during installation or background idle time,
+# which significantly reduces startup time and eliminates UI "jank".
+
+# --- CRITICAL STARTUP PATH ---
+# These classes are required to render the first frame of the application.
 HSPLandroidx/compose/runtime/ComposerImpl
 HSPLandroidx/compose/ui/platform/AndroidComposeView
 HSPLandroidx/activity/ComponentActivity
@@ -18,7 +22,8 @@ HSPLio/erthiscan/api/ErthiscanApi
 HSPLio/erthiscan/api/Models
 HSPLio/erthiscan/nav/Routes
 
-# Compose
+# --- UI SMOOTHNESS (JETPACK COMPOSE) ---
+# Common Material 3 components are pre-compiled to ensure smooth rendering.
 HSPLandroidx/compose/foundation/layout/Box
 HSPLandroidx/compose/foundation/layout/Column
 HSPLandroidx/compose/foundation/layout/Row
@@ -30,20 +35,24 @@ HSPLandroidx/compose/foundation/background
 HSPLandroidx/compose/foundation/clickable
 HSPLandroidx/compose/foundation/shape/RoundedCornerShape
 
-# CameraX
+# --- SCANNER READINESS (CAMERAX & MLKIT) ---
+# Pre-compiling CameraX and MLKit is critical for the "Time to Scan" metric.
 HSPLandroidx/camera/core/CameraX
 HSPLandroidx/camera/lifecycle/ProcessCameraProvider
 HSPLcom/google/mlkit/vision/barcode/BarcodeScanning
 
-# Kotlinx
+# --- CORE INFRASTRUCTURE (KOTLINX) ---
+# Pre-compiles serialization and threading logic.
 HSPLkotlinx/serialization/json/Json
 HSPLkotlinx/coroutines/flow/StateFlow
 
-# OkHttp/Retrofit
+# --- NETWORKING (OKHTTP/RETROFIT) ---
+# Pre-compiles networking bootstrap logic to avoid overhead on first request.
 HSPLokhttp3/OkHttpClient
 HSPLretrofit2/Retrofit
 HSPLretrofit2/KotlinExtensions
 
-# Hilt
+# --- DEPENDENCY INJECTION (HILT) ---
+# Pre-compiles Hilt generated entry points.
 HSPLdagger/hilt/android/HiltAndroidApp
 HSPLdagger/hilt/android/AndroidEntryPoint

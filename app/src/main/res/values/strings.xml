@@ -1,4 +1,13 @@
+<!-- 
+    ERTHISCAN STRING RESOURCES
+    
+    NAMING CONVENTION:
+    Resources are grouped by feature (e.g., 'tab_', 'error_', 'sort_') to ensure 
+    discoverability and maintainability. Plurals are used for dynamically 
+    counted entities to support correct grammatical forms across locales.
+-->
 <resources>
+    <!-- GENERAL UI -->
     <string name="app_name">Erthiscan</string>
     <string name="companies_title">Companies</string>
     <string name="search_companies_hint">Search companies…</string>
@@ -12,11 +21,15 @@
     <string name="previous_page">←</string>
     <string name="next_page">→</string>
     <string name="page_indicator">%1$d / %2$d</string>
+    
+    <!-- SORTING & FILTERING -->
     <string name="sort_reports">Reports</string>
     <string name="sort_score_desc">Score ↓</string>
     <string name="sort_score_asc">Score ↑</string>
     <string name="sort_name_asc">A → Z</string>
     <string name="sort_name_desc">Z → A</string>
+    
+    <!-- PROFILE & AUTHENTICATION -->
     <!-- Profile -->
     <string name="my_reports">My Reports</string>
     <string name="my_challenges">My Challenges</string>
@@ -29,6 +42,8 @@
         <item quantity="one">%1$d report · %2$d challenge</item>
         <item quantity="other">%1$d reports · %2$d challenges</item>
     </plurals>
+    
+    <!-- COMPANY PAGE & REPORTING -->
     <!-- Company Page -->
     <string name="failed_to_load">Failed to load</string>
     <string name="add_report">Add Report</string>
@@ -50,6 +65,8 @@
     <string name="edit">Edit</string>
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
+    
+    <!-- CREATE/EDIT REPORT FORMS -->
     <!-- Create Report -->
     <string name="edit_report">Edit Report</string>
     <string name="challenge_report">Challenge Report</string>
@@ -57,6 +74,8 @@
     <string name="source_url_hint">Source URL…</string>
     <string name="submitting">Submitting…</string>
     <string name="submit">Submit</string>
+    
+    <!-- ERROR & CONFIRMATION DIALOGS -->
     <!-- Error messages -->
     <string name="delete_report_confirmation">Delete this report? Its challenges will also be removed.</string>
     <string name="delete_challenge_confirmation">Delete this challenge?</string>
@@ -68,17 +87,23 @@
     <string name="error_server">Server error</string>
     <string name="error_unknown">Unknown error</string>
     <string name="error_submit_failed">Failed to submit report</string>
+    
+    <!-- NAVIGATION TABS -->
     <!-- Scan -->
     <string name="scan_barcode">Scan Barcode</string>
     <string name="toggle_flashlight">Toggle flashlight</string>
     <string name="tab_companies">Companies</string>
     <string name="tab_scan">Scan</string>
     <string name="tab_profile">Profile</string>
+    
+    <!-- SCANNER PRODUCT MODAL -->
     <!-- Product sheet -->
     <string name="product_label">product</string>
     <string name="company_label">company</string>
     <string name="view_company_page">View Company Page</string>
     <string name="product_information_source">Product Information Source</string>
+    
+    <!-- NOT FOUND FALLBACK (OPEN FOOD FACTS) -->
     <!-- Not found sheet -->
     <string name="product_not_found">Product Not Found</string>
     <string name="help_build_database">Help build the database</string>

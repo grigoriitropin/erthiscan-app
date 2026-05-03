@@ -1,3 +1,7 @@
-# Default ignored files
+# --- IDE INTERNAL STATE IGNORE ---
+
+# SHELF: Temporary storage for local changes that are not ready for commit.
 /shelf/
+
+# WORKSPACE: Local IDE state including open tabs and UI positions.
 /workspace.xml
