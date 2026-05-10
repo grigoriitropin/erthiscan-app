@@ -106,8 +106,10 @@ fun CompanyPage(
     // ERROR OBSERVATION: Shows transient network/logic errors via Snackbar.
     LaunchedEffect(state.error, authError) {
         state.error?.let {
-            snackbarHostState.showSnackbar(it.asString(context))
-            vm.dismissError()
+            if (data != null) {
+                snackbarHostState.showSnackbar(it.asString(context))
+                vm.dismissError()
+            }
         }
         authError?.let {
             snackbarHostState.showSnackbar(it.asString(context))
@@ -141,7 +143,19 @@ fun CompanyPage(
                     .padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Text(if (state.loading) stringResource(R.string.loading) else stringResource(R.string.failed_to_load), color = colorScheme.onSurfaceVariant)
+                if (state.loading) {
+                    Text(stringResource(R.string.loading), color = colorScheme.onSurfaceVariant)
+                } else if (state.error != null) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(state.error!!.asComposableString(), color = colorScheme.error)
+                        Spacer(Modifier.height(16.dp))
+                        Button(onClick = { vm.refresh() }) {
+                            Text(stringResource(R.string.retry))
+                        }
+                    }
+                } else {
+                    Text(stringResource(R.string.failed_to_load), color = colorScheme.onSurfaceVariant)
+                }
             }
             return@Scaffold
         }

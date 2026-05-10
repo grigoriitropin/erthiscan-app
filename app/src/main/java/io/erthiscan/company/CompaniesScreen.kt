@@ -76,11 +76,15 @@ fun CompaniesScreen(
     // ERROR REPORTING SIDE EFFECT:
     // Watches the 'error' field in the state. If an error appears, we show it 
     // in a Snackbar and then immediately tell the ViewModel to dismiss it.
+    // NOTE: We only show the Snackbar if we already have data. If the list is empty, 
+    // the error is shown as a full-screen message and shouldn't be dismissed automatically.
     val context = LocalContext.current
     LaunchedEffect(state.error) {
         state.error?.let {
-            snackbarHostState.showSnackbar(it.asString(context))
-            vm.dismissError()
+            if (state.companies.isNotEmpty()) {
+                snackbarHostState.showSnackbar(it.asString(context))
+                vm.dismissError()
+            }
         }
     }
 
@@ -167,6 +171,29 @@ fun CompaniesScreen(
                 // INITIAL LOADING STATE
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.loading), color = colorScheme.onSurfaceVariant)
+                }
+            } else if (state.error != null && state.companies.isEmpty()) {
+                // ERROR RECOVERY STATE
+                Column(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = state.error!!.asComposableString(),
+                        color = colorScheme.error,
+                        fontSize = 16.sp
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = { vm.retry() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colorScheme.primaryContainer,
+                            contentColor = colorScheme.onPrimaryContainer
+                        )
+                    ) {
+                        Text(stringResource(R.string.retry))
+                    }
                 }
             } else if (!state.loading && state.companies.isEmpty()) {
                 // EMPTY RESULTS STATE

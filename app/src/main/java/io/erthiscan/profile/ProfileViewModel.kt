@@ -82,7 +82,7 @@ class ProfileViewModel @Inject constructor(
         try {
             // API CALL: Retrieves the authenticated user's profile and reports.
             val p = reports.myProfile()
-            _ui.update { it.copy(profile = p, loading = false) }
+            _ui.update { it.copy(profile = p, loading = false, error = null) }
         } catch (e: Exception) {
             // ERROR HANDLING: Maps backend/network exceptions to a UI-friendly format.
             _ui.update { it.copy(loading = false, error = UiError.from(e)) }

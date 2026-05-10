@@ -62,8 +62,10 @@ fun ProfileScreen(
     // ERROR OBSERVATION: Displays transient network or authentication failures.
     LaunchedEffect(ui.error, authError) {
         ui.error?.let {
-            snackbarHostState.showSnackbar(it.asString(context))
-            vm.dismissError()
+            if (ui.profile != null) {
+                snackbarHostState.showSnackbar(it.asString(context))
+                vm.dismissError()
+            }
         }
         authError?.let {
             snackbarHostState.showSnackbar(it.asString(context))
@@ -95,6 +97,7 @@ fun ProfileScreen(
                     onShowReports = onShowReports,
                     onShowChallenges = onShowChallenges,
                     onLogout = { vm.logout() },
+                    onRetry = { vm.refresh() },
                     ui = ui
                 )
             } else {
@@ -112,6 +115,7 @@ private fun LoggedInProfile(
     onShowReports: () -> Unit,
     onShowChallenges: () -> Unit,
     onLogout: () -> Unit,
+    onRetry: () -> Unit,
     ui: ProfileUiState
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -141,6 +145,30 @@ private fun LoggedInProfile(
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
+        } else if (ui.loading) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.loading),
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 14.sp
+            )
+        } else if (ui.error != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = ui.error.asComposableString(),
+                color = colorScheme.error,
+                fontSize = 14.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorScheme.primaryContainer,
+                    contentColor = colorScheme.onPrimaryContainer
+                )
+            ) {
+                Text(stringResource(R.string.retry))
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
