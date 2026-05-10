@@ -28,7 +28,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.dialog
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.toRoute
 import io.erthiscan.company.CompaniesScreen
 import io.erthiscan.company.page.CompanyPage
@@ -193,7 +195,12 @@ fun MainScreen(startRoute: Route? = null) {
                     },
                 )
             }
-            composable<Route.CreateReport> { entry ->
+            dialog<Route.CreateReport>(
+                dialogProperties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false
+                )
+            ) { entry ->
                 val r = entry.toRoute<Route.CreateReport>()
                 CreateReportScreen(
                     companyName = r.companyName,
