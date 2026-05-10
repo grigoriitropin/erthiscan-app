@@ -21,9 +21,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,7 +69,32 @@ fun CreateReportScreen(
     // STATE OBSERVATION: Collects the UI state from the ViewModel in a lifecycle-aware manner.
     val state by vm.state.collectAsStateWithLifecycle()
     val colorScheme = MaterialTheme.colorScheme
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    
+    var showDiscardDialog by remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    val attemptDismiss = {
+        if (vm.hasUnsavedChanges()) {
+            showDiscardDialog = true
+        } else {
+            onBack()
+        }
+    }
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { sheetValue ->
+            if (sheetValue == SheetValue.Hidden) {
+                if (vm.hasUnsavedChanges()) {
+                    showDiscardDialog = true
+                    false
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        }
+    )
 
     // SIDE EFFECT: NAVIGATION
     // When the 'submitted' flag becomes true in the state, we trigger the callback.
@@ -74,7 +104,31 @@ fun CreateReportScreen(
     }
 
     // SYSTEM NAVIGATION: Intercepts the physical back button or gesture.
-    BackHandler { onBack() }
+    BackHandler { attemptDismiss() }
+
+    // DISCARD DIALOG: Warns user before losing entered text.
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text(stringResource(R.string.discard_changes_title)) },
+            text = { Text(stringResource(R.string.discard_changes_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDiscardDialog = false
+                        onBack()
+                    }
+                ) {
+                    Text(stringResource(R.string.discard), color = colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) {
+                    Text(stringResource(R.string.keep_editing))
+                }
+            }
+        )
+    }
 
     // DYNAMIC TITLE: Determined by the ViewModel's initialization parameters.
     val title = when {
@@ -84,7 +138,7 @@ fun CreateReportScreen(
     }
 
     ModalBottomSheet(
-        onDismissRequest = onBack,
+        onDismissRequest = attemptDismiss,
         sheetState = sheetState,
         containerColor = colorScheme.surface,
         contentWindowInsets = { WindowInsets.ime }

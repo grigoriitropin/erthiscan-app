@@ -81,6 +81,15 @@ class CreateReportViewModel @Inject constructor(
     fun onSource(s: String) = _state.update { it.copy(source = s) }
 
     /**
+     * Checks if the current state differs from the initial state passed via navigation arguments.
+     * Used to prevent accidental data loss when dismissing the bottom sheet.
+     */
+    fun hasUnsavedChanges(): Boolean {
+        val s = _state.value
+        return s.text != route.initialText || s.source != route.initialSource
+    }
+
+    /**
      * SUBMIT FLOW:
      * 1. VALIDATION: Ensures required fields are not blank before hitting the network.
      * 2. LOADING STATE: Prevents double-submissions.
