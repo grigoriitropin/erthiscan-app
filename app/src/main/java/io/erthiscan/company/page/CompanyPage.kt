@@ -240,6 +240,7 @@ fun CompanyPage(
                     items(data.reports, key = { it.id }) { report ->
                         ReportCardWithSubs(
                             report = report,
+                            currentUserId = authState.userId,
                             // CHALLENGE CALLBACK: Navigates to CreateReportScreen with a parentId reference.
                             onChallenge = { withAuth { onCreateChallenge(data.name, report.id) } },
                             // EDIT CALLBACK: 
@@ -336,6 +337,7 @@ private fun ScoreCard(ethicalScore: Float, reportCount: Int) {
 @Composable
 private fun ReportCardWithSubs(
     report: ReportItem,
+    currentUserId: Int?,
     onChallenge: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -409,9 +411,11 @@ private fun ReportCardWithSubs(
                 }
                 // EDIT/DELETE: Only rendered if the user has permission (handled by logic in the ViewModel 
                 // but the UI must provide the callbacks).
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    EditChip(onClick = onEdit)
-                    DeleteChip(onClick = { showDeleteDialog = true })
+                if (currentUserId != null && report.userId == currentUserId) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        EditChip(onClick = onEdit)
+                        DeleteChip(onClick = { showDeleteDialog = true })
+                    }
                 }
             }
 
@@ -517,6 +521,7 @@ private fun ReportCardWithSubs(
                         report.subReports.forEach { sub ->
                             SubReportCard(
                                 sub = sub,
+                                currentUserId = currentUserId,
                                 // NESTED EDIT: Triggers the same top-level edit flow, pre-filling 
                                 // the form with sub-report specific data.
                                 onEdit = { onSubEdit(sub) },
@@ -539,6 +544,7 @@ private fun ReportCardWithSubs(
 @Composable
 private fun SubReportCard(
     sub: SubReportItem,
+    currentUserId: Int?,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onVote: (Int, Int) -> Unit,
@@ -576,9 +582,11 @@ private fun SubReportCard(
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 11.sp
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                EditChip(onClick = onEdit)
-                DeleteChip(onClick = { showDeleteDialog = true })
+            if (currentUserId != null && sub.userId == currentUserId) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    EditChip(onClick = onEdit)
+                    DeleteChip(onClick = { showDeleteDialog = true })
+                }
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
