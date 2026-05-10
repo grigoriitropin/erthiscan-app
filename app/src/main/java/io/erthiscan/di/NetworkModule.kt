@@ -160,7 +160,7 @@ object NetworkModule {
                     }
                     if (!refreshResp.isSuccessful) return@authenticator null
 
-                    val raw = refreshResp.body?.string() ?: return@authenticator null
+                    val raw = refreshResp.body.string()
                     val parsed = json.decodeFromString(RefreshResponse.serializer(), raw)
 
                     // ATOMIC UPDATE: Persist new tokens.

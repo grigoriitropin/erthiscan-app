@@ -1,10 +1,10 @@
 [versions]
 # agp: Android Gradle Plugin version. Defines the build system logic for Android.
-agp = "9.2.0"
+agp = "9.2.1"
 # kotlin: The Kotlin programming language version used for both app and build logic.
-kotlin = "2.2.21"
+kotlin = "2.3.21"
 # kotlinSerialization: Version for the Kotlinx Serialization plugin, must align with the Kotlin version.
-kotlinSerialization = "2.2.21"
+kotlinSerialization = "2.3.21"
 # ksp: Kotlin Symbol Processing version. Fast code generation compatible with AGP 9.1.1+.
 ksp = "2.3.4"
 
@@ -22,7 +22,7 @@ activityCompose = "1.13.0"
 constraintlayout = "2.2.1"
 
 # composeBom: Bill of Materials for Compose, ensuring all Compose libraries are compatible.
-composeBom = "2026.04.01"
+composeBom = "2026.05.00"
 # lifecycle: Manages Android lifecycle states (ViewModel, LiveData, etc).
 lifecycle = "2.10.0"
 # navigation: Component for handling in-app navigation, optimized for Compose.
@@ -40,12 +40,12 @@ okhttp = "5.3.2"
 # kotlinxSerializationJson: Library for JSON parsing in Kotlin.
 kotlinxSerializationJson = "1.11.0"
 # coroutines: Asynchronous programming support for Kotlin.
-coroutines = "1.10.2"
+coroutines = "1.11.0"
 
 # camerax: Modern Camera API for Android, simplifying camera integration.
-camerax = "1.6.0"
+camerax = "1.6.1"
 # cameraViewfinder: UI component for displaying camera previews in Compose.
-cameraViewfinder = "1.6.0"
+cameraViewfinder = "1.6.1"
 # mlkitBarcode: ML Kit's barcode scanning library for high-performance detection.
 mlkitBarcode = "17.3.0"
 

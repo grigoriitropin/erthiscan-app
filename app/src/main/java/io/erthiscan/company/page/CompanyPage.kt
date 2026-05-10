@@ -59,6 +59,9 @@ import io.erthiscan.api.ReportItem
 import io.erthiscan.api.SubReportItem
 import kotlin.math.roundToInt
 
+import io.erthiscan.auth.AuthViewModel
+import io.erthiscan.auth.SignInSheet
+
 /**
  * COMPANY PAGE: The detailed profile view for a specific company.
  * 
@@ -79,20 +82,48 @@ fun CompanyPage(
     onCreateChallenge: (String, Int) -> Unit,
     onEditReport: (Int, String, String, String) -> Unit,
     vm: CompanyPageViewModel = hiltViewModel(),
+    authVm: AuthViewModel = hiltViewModel(),
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val state by vm.state.collectAsStateWithLifecycle()
+    val authState by authVm.state.collectAsStateWithLifecycle()
+    val authError by authVm.error.collectAsStateWithLifecycle()
+    
     val data = state.company
     val context = LocalContext.current
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // AUTH STATE: Determines if interactive actions are allowed.
+    val isLoggedIn = authState.isLoggedIn
+    var showSignInSheet by remember { mutableStateOf(false) }
+
+    // AUTH GATE: Helper to intercept unauthenticated actions.
+    fun withAuth(action: () -> Unit) {
+        if (isLoggedIn) action() else showSignInSheet = true
+    }
+
     // ERROR OBSERVATION: Shows transient network/logic errors via Snackbar.
-    LaunchedEffect(state.error) {
+    LaunchedEffect(state.error, authError) {
         state.error?.let {
             snackbarHostState.showSnackbar(it.asString(context))
             vm.dismissError()
         }
+        authError?.let {
+            snackbarHostState.showSnackbar(it.asString(context))
+            authVm.dismissError()
+        }
+    }
+
+    // SIGN IN SHEET: Encourages guest users to log in when they click protected actions.
+    if (showSignInSheet) {
+        SignInSheet(
+            onDismiss = { showSignInSheet = false },
+            onGoogleIdToken = { token ->
+                authVm.signInGoogle(token)
+                showSignInSheet = false
+            }
+        )
     }
 
     Scaffold(
@@ -156,7 +187,7 @@ fun CompanyPage(
                     Button(
                         // CALLBACK: Triggered on click, passes current company name to the form 
                         // to provide context for the user during report writing.
-                        onClick = { onCreateReport(data.name) },
+                        onClick = { withAuth { onCreateReport(data.name) } },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -210,7 +241,7 @@ fun CompanyPage(
                         ReportCardWithSubs(
                             report = report,
                             // CHALLENGE CALLBACK: Navigates to CreateReportScreen with a parentId reference.
-                            onChallenge = { onCreateChallenge(data.name, report.id) },
+                            onChallenge = { withAuth { onCreateChallenge(data.name, report.id) } },
                             // EDIT CALLBACK: 
                             // 1. Extracts the primary source URL (firstOrNull) to pre-fill the form.
                             // 2. Passes the report's text and company name to allow full context during editing.
@@ -218,7 +249,7 @@ fun CompanyPage(
                             // DELETE CALLBACK: Triggers the ViewModel's destructive API call.
                             onDelete = { vm.delete(report.id) },
                             // VOTE CALLBACK: Delegates the integer value (1 or -1) to the ViewModel.
-                            onVote = { reportId, value -> vm.vote(reportId, value) },
+                            onVote = { reportId, value -> withAuth { vm.vote(reportId, value) } },
                             // SUB-REPORT (CHALLENGE) EDIT:
                             // Similar to primary reports, we pre-fill the form with the specific sub-report data.
                             onSubEdit = { sub ->
@@ -227,7 +258,7 @@ fun CompanyPage(
                             // SUB-REPORT DELETE: Targeted deletion of a nested challenge.
                             onSubDelete = { sub -> vm.delete(sub.id) },
                             // SUB-REPORT VOTE: Reactive voting on a specific challenge.
-                            onSubVote = { subId, value -> vm.vote(subId, value) },
+                            onSubVote = { subId, value -> withAuth { vm.vote(subId, value) } },
                         )
                     }
                 }
