@@ -65,6 +65,8 @@ sealed class UiError {
          */
         fun from(t: Throwable): UiError = when (t) {
             is java.net.UnknownHostException -> Resource(io.erthiscan.R.string.error_no_internet)
+            is java.net.SocketTimeoutException -> Resource(io.erthiscan.R.string.error_timeout)
+            is java.net.ConnectException -> Resource(io.erthiscan.R.string.error_server_unreachable)
             is retrofit2.HttpException -> {
                 when (t.code()) {
                     401 -> Resource(io.erthiscan.R.string.error_unauthorized)

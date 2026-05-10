@@ -65,6 +65,7 @@
     <string name="edit">Edit</string>
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
+    <string name="retry">Retry</string>
     
     <!-- CREATE/EDIT REPORT FORMS -->
     <!-- Create Report -->
@@ -77,11 +78,17 @@
     
     <!-- ERROR & CONFIRMATION DIALOGS -->
     <!-- Error messages -->
+    <string name="discard_changes_title">Discard changes?</string>
+    <string name="discard_changes_message">If you go back now, your text will be lost.</string>
+    <string name="discard">Discard</string>
+    <string name="keep_editing">Keep editing</string>
     <string name="delete_report_confirmation">Delete this report? Its challenges will also be removed.</string>
     <string name="delete_challenge_confirmation">Delete this challenge?</string>
     <string name="report_text_required">Report text is required</string>
     <string name="source_url_required">Source URL is required</string>
     <string name="error_no_internet">No internet connection</string>
+    <string name="error_timeout">Slow connection. Request timed out.</string>
+    <string name="error_server_unreachable">Server is temporarily unavailable.</string>
     <string name="error_unauthorized">Unauthorized access</string>
     <string name="error_not_found">Resource not found</string>
     <string name="error_server">Server error</string>

@@ -114,9 +114,9 @@ object NetworkModule {
         }
 
         return OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-            .writeTimeout(20, TimeUnit.SECONDS)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
             .certificatePinner(CERTIFICATE_PINNER)
             // LAYER 1: Token Injection
             .addInterceptor { chain ->
@@ -160,7 +160,7 @@ object NetworkModule {
                     }
                     if (!refreshResp.isSuccessful) return@authenticator null
 
-                    val raw = refreshResp.body?.string() ?: return@authenticator null
+                    val raw = refreshResp.body.string()
                     val parsed = json.decodeFromString(RefreshResponse.serializer(), raw)
 
                     // ATOMIC UPDATE: Persist new tokens.

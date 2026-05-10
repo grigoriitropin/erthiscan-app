@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.erthiscan.api.CompanyDetail
+import io.erthiscan.auth.AuthManager
 import io.erthiscan.data.CompaniesRepository
 import io.erthiscan.data.ReportsRepository
 import io.erthiscan.nav.Route
@@ -47,6 +48,7 @@ class CompanyPageViewModel @Inject constructor(
     // Repositories injected via Hilt (SingletonComponent).
     private val companies: CompaniesRepository,
     private val reports: ReportsRepository,
+    private val authManager: AuthManager,
     // SAVED STATE HANDLE: Provided by Hilt/Navigation; stores activity-scoped arguments.
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -70,6 +72,16 @@ class CompanyPageViewModel @Inject constructor(
         // Automatically fetch data as soon as the ViewModel is created. 
         // This ensures the user sees data immediately upon navigation.
         refresh() 
+
+        // AUTH OBSERVATION:
+        // Automatically re-fetch company details when authentication state changes.
+        // This ensures that user-specific data (like 'user_vote') is loaded immediately 
+        // after a successful login without manual refresh.
+        viewModelScope.launch {
+            authManager.state.collect { 
+                refresh()
+            }
+        }
     }
 
     /**

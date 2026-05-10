@@ -1,8 +1,6 @@
 package io.erthiscan.profile
 
-import android.util.Log
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.LocalActivity
 import io.erthiscan.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,7 +10,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,17 +21,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
-import androidx.credentials.CredentialManager
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.exceptions.NoCredentialException
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import io.erthiscan.BuildConfig
 import io.erthiscan.company.page.ConfirmDeleteDialog
 import io.erthiscan.company.page.DeleteChip
 import io.erthiscan.company.page.EditChip
+
+import io.erthiscan.auth.AuthViewModel
+import io.erthiscan.auth.GoogleSignInButton
 
 /**
  * PROFILE SCREEN
@@ -50,10 +44,12 @@ fun ProfileScreen(
     onShowChallenges: () -> Unit,
     onCompanyClick: (Int, Int) -> Unit,
     modifier: Modifier = Modifier,
-    vm: ProfileViewModel = hiltViewModel()
+    vm: ProfileViewModel = hiltViewModel(),
+    authVm: AuthViewModel = hiltViewModel()
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val ui by vm.ui.collectAsStateWithLifecycle()
+    val authError by authVm.error.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -64,10 +60,16 @@ fun ProfileScreen(
     }
 
     // ERROR OBSERVATION: Displays transient network or authentication failures.
-    LaunchedEffect(ui.error) {
+    LaunchedEffect(ui.error, authError) {
         ui.error?.let {
+            if (ui.profile != null) {
+                snackbarHostState.showSnackbar(it.asString(context))
+                vm.dismissError()
+            }
+        }
+        authError?.let {
             snackbarHostState.showSnackbar(it.asString(context))
-            vm.dismissError()
+            authVm.dismissError()
         }
     }
 
@@ -95,10 +97,11 @@ fun ProfileScreen(
                     onShowReports = onShowReports,
                     onShowChallenges = onShowChallenges,
                     onLogout = { vm.logout() },
+                    onRetry = { vm.refresh() },
                     ui = ui
                 )
             } else {
-                SignInScreen(onGoogleIdToken = { token -> vm.signInGoogle(token) })
+                SignInScreen(onGoogleIdToken = { token -> authVm.signInGoogle(token) })
             }
         }
     }
@@ -112,6 +115,7 @@ private fun LoggedInProfile(
     onShowReports: () -> Unit,
     onShowChallenges: () -> Unit,
     onLogout: () -> Unit,
+    onRetry: () -> Unit,
     ui: ProfileUiState
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -133,13 +137,38 @@ private fun LoggedInProfile(
         )
 
         // CONTRIBUTION STATS: Shows total impact using plural resources for localization.
-        if (ui.profile != null) {
+        val profile = ui.profile
+        if (profile != null) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = pluralStringResource(R.plurals.reports_and_challenges, ui.profile!!.reportCount, ui.profile!!.reportCount, ui.profile!!.challengeCount),
+                text = pluralStringResource(R.plurals.reports_and_challenges, profile.reportCount, profile.reportCount, profile.challengeCount),
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
+        } else if (ui.loading) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.loading),
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 14.sp
+            )
+        } else if (ui.error != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = ui.error.asComposableString(),
+                color = colorScheme.error,
+                fontSize = 14.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorScheme.primaryContainer,
+                    contentColor = colorScheme.onPrimaryContainer
+                )
+            ) {
+                Text(stringResource(R.string.retry))
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -453,9 +482,6 @@ fun MyChallengesScreen(
 @Composable
 private fun SignInScreen(onGoogleIdToken: (String) -> Unit) {
     val colorScheme = MaterialTheme.colorScheme
-    val activity = LocalActivity.current
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -480,48 +506,9 @@ private fun SignInScreen(onGoogleIdToken: (String) -> Unit) {
         Spacer(modifier = Modifier.height(48.dp))
 
         // AUTH TRIGGER: Launches the system BottomSheet for Google Account selection.
-        Button(
-            onClick = {
-                scope.launch {
-                    try {
-                        val currentActivity = activity ?: return@launch
-                        val credentialManager = CredentialManager.create(context)
-
-                        // CONFIG: Uses the server's Client ID to verify the token backend-side.
-                        val googleIdOption = GetGoogleIdOption.Builder()
-                            .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
-                            .setFilterByAuthorizedAccounts(false) // Allows selecting any account.
-                            .build()
-
-                        val request = GetCredentialRequest.Builder()
-                            .addCredentialOption(googleIdOption)
-                            .build()
-
-                        // EXECUTION: Suspends until the user selects an account or cancels.
-                        val result = credentialManager.getCredential(currentActivity, request)
-                        val googleIdToken = GoogleIdTokenCredential.createFrom(result.credential.data)
-
-                        // CALLBACK: Passes the JWT idToken to the ViewModel for backend verification.
-                        onGoogleIdToken(googleIdToken.idToken)
-                    } catch (e: NoCredentialException) {
-                        Log.d("ErthiScan", "No account selected by user", e)
-                    } catch (e: Exception) {
-                        Log.e("ErthiScan", "Credential Manager failed", e)
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = colorScheme.primaryContainer,
-                contentColor = colorScheme.onPrimaryContainer
-            )
-        ) {
-            Text(
-                text = stringResource(R.string.sign_in_google),
-                fontSize = 16.sp,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-        }
+        GoogleSignInButton(
+            onGoogleIdToken = onGoogleIdToken,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }

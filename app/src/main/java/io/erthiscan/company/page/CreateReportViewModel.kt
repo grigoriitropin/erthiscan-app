@@ -73,12 +73,21 @@ class CreateReportViewModel @Inject constructor(
      * Updates the report text with a strict 150-character limit.
      * WHY: To encourage concise, data-driven claims and prevent "wall of text" spam.
      */
-    fun onText(t: String) { if (t.length <= 150) _state.update { it.copy(text = t) } }
+    fun onText(t: String) { _state.update { it.copy(text = t.take(150)) } }
 
     /**
      * Updates the source URL field.
      */
     fun onSource(s: String) = _state.update { it.copy(source = s) }
+
+    /**
+     * Checks if the current state differs from the initial state passed via navigation arguments.
+     * Used to prevent accidental data loss when dismissing the bottom sheet.
+     */
+    fun hasUnsavedChanges(): Boolean {
+        val s = _state.value
+        return s.text != route.initialText || s.source != route.initialSource
+    }
 
     /**
      * SUBMIT FLOW:

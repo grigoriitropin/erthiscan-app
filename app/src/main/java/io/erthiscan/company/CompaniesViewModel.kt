@@ -138,6 +138,16 @@ class CompaniesViewModel @Inject constructor(
     // This will trigger the 'combine' pipeline in 'init'.
     fun nextPage() { if (_state.value.page < _state.value.pages) pageFlow.value = _state.value.page + 1 }
     fun prevPage() { if (_state.value.page > 1) pageFlow.value = _state.value.page - 1 }
+
+    /**
+     * RETRY: Forces a reload with the current parameters. 
+     * Essential for recovering from offline states without changing the search query.
+     */
+    fun retry() {
+        viewModelScope.launch {
+            load(queryFlow.value, sortFlow.value, pageFlow.value)
+        }
+    }
     
     /**
      * DISMISS ERROR: Reset the error state to 'null'.

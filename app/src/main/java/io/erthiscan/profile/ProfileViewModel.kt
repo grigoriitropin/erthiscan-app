@@ -63,7 +63,11 @@ class ProfileViewModel @Inject constructor(
         // This ensures that if the user logs out from another part of the app, 
         // the Profile screen reacts instantly without a manual refresh.
         viewModelScope.launch {
-            authManager.state.collect { s -> _ui.update { it.copy(auth = s) } }
+            authManager.state.collect { s -> 
+                _ui.update { it.copy(auth = s) }
+                // AUTO-REFRESH: Fetch profile details immediately upon successful login.
+                if (s.isLoggedIn) refresh()
+            }
         }
     }
 
@@ -78,26 +82,10 @@ class ProfileViewModel @Inject constructor(
         try {
             // API CALL: Retrieves the authenticated user's profile and reports.
             val p = reports.myProfile()
-            _ui.update { it.copy(profile = p, loading = false) }
+            _ui.update { it.copy(profile = p, loading = false, error = null) }
         } catch (e: Exception) {
             // ERROR HANDLING: Maps backend/network exceptions to a UI-friendly format.
             _ui.update { it.copy(loading = false, error = UiError.from(e)) }
-        }
-    }
-
-    /**
-     * SIGN IN WITH GOOGLE: Exchanges an ID token for a session with our backend.
-     * 
-     * @param idToken The credential retrieved from the Google Sign-In intent.
-     */
-    fun signInGoogle(idToken: String) = viewModelScope.launch {
-        try {
-            // DELEGATION: Offloads the token exchange to the AuthRepository.
-            authRepo.signInWithGoogle(idToken)
-            // REFRESH: Immediately fetch the new user's profile upon success.
-            refresh()
-        } catch (e: Exception) {
-            _ui.update { it.copy(error = UiError.from(e)) }
         }
     }
 
