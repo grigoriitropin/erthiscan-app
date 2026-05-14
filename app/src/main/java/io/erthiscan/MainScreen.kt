@@ -205,7 +205,10 @@ fun MainScreen(startRoute: Route? = null) {
                 CreateReportScreen(
                     companyName = r.companyName,
                     onBack = { navController.popBackStack() },
-                    onSubmitted = { navController.popBackStack() },
+                    onSubmitted = {
+                        navController.previousBackStackEntry?.savedStateHandle?.set("report_changed", System.currentTimeMillis())
+                        navController.popBackStack()
+                    },
                 )
             }
         }

@@ -11,9 +11,11 @@ import io.erthiscan.data.CompaniesRepository
 import io.erthiscan.data.ReportsRepository
 import io.erthiscan.nav.Route
 import io.erthiscan.ui.UiError
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -61,6 +63,7 @@ class CompanyPageViewModel @Inject constructor(
 
     // INTERNAL STATE: Thread-safe holder for UI-visible properties.
     private val _state = MutableStateFlow(CompanyPageState())
+    private var refreshJob: Job? = null
     
     /**
      * STATE: Public read-only flow observed by the Compose UI.
@@ -68,44 +71,32 @@ class CompanyPageViewModel @Inject constructor(
     val state: StateFlow<CompanyPageState> = _state.asStateFlow()
 
     init { 
-        // INITIAL LOAD: 
-        // Automatically fetch data as soon as the ViewModel is created. 
-        // This ensures the user sees data immediately upon navigation.
-        refresh() 
+        refresh()
 
-        // AUTH OBSERVATION:
-        // Automatically re-fetch company details when authentication state changes.
-        // This ensures that user-specific data (like 'user_vote') is loaded immediately 
-        // after a successful login without manual refresh.
         viewModelScope.launch {
-            authManager.state.collect { 
+            authManager.state.collectLatest { 
                 refresh()
+            }
+        }
+
+        viewModelScope.launch {
+            savedStateHandle.getStateFlow("report_changed", 0L).collect { ts ->
+                if (ts != 0L) refresh(silent = true)
             }
         }
     }
 
-    /**
-     * REFRESH: Re-fetches the company detail from the network.
-     * 
-     * WORKFLOW:
-     * 1. Set 'loading = true' to show progress in the UI.
-     * 2. Perform network I/O via the [CompaniesRepository].
-     * 3. On success: Update the state with new company data and clear any previous errors.
-     * 4. On failure: Map the exception to [UiError] and stop the loading indicator.
-     */
-    fun refresh() = viewModelScope.launch {
-        // Atomic state transition.
-        _state.update { it.copy(loading = true) }
-        
-        try {
-            // Suspends until network response or timeout.
-            val c = companies.detail(companyId)
+    fun refresh(silent: Boolean = false) {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
+            if (!silent) _state.update { it.copy(loading = true) }
             
-            // Populate state with fresh hierarchical data.
-            _state.update { it.copy(company = c, loading = false, error = null) }
-        } catch (e: Exception) {
-            // Stop loading and propagate error to the UI.
-            _state.update { it.copy(loading = false, error = UiError.from(e)) }
+            try {
+                val c = companies.detail(companyId)
+                _state.update { it.copy(company = c, loading = false, error = null) }
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, error = UiError.from(e)) }
+            }
         }
     }
 
@@ -123,8 +114,7 @@ class CompanyPageViewModel @Inject constructor(
             // POST request to backend.
             reports.vote(reportId, value)
             
-            // Backend update successful -> Trigger UI refresh to show new counts/score.
-            refresh()
+            refresh(silent = true)
         } catch (e: Exception) {
             // Error mapping: typically handles 401 (Auth required), 404, or 422.
             _state.update { it.copy(error = UiError.from(e)) }
@@ -144,7 +134,7 @@ class CompanyPageViewModel @Inject constructor(
             reports.deleteReport(reportId)
             
             // Sync with backend to reflect the removal in the ethical score.
-            refresh()
+            refresh(silent = true)
         } catch (e: Exception) {
             // Standard error propagation.
             _state.update { it.copy(error = UiError.from(e)) }

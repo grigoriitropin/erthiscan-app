@@ -1,23 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 
-    LAUNCHER BACKGROUND: The base layer of the adaptive app icon.
-    
-    DESIGN RATIONALE:
-    Uses a standard 108dp viewport. The background is a solid brand-green 
-    (#3DDC84) overlaid with a subtle 10dp grid pattern. This grid provides 
-    visual texture and aligns with Material Design's adaptive icon safety zones.
--->
+<!--
+  ~ Copyright (C) 2026 The Android Open Source Project
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~      http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
 <vector
     android:height="108dp"
     android:width="108dp"
     android:viewportHeight="108"
     android:viewportWidth="108"
     xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- BASE FILL -->
     <path android:fillColor="#3DDC84"
           android:pathData="M0,0h108v108h-108z"/>
-    
-    <!-- VERTICAL GRID LINES -->
     <path android:fillColor="#00000000" android:pathData="M9,0L9,108"
           android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
     <path android:fillColor="#00000000" android:pathData="M19,0L19,108"
@@ -38,8 +42,6 @@
           android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
     <path android:fillColor="#00000000" android:pathData="M99,0L99,108"
           android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
-    
-    <!-- HORIZONTAL GRID LINES -->
     <path android:fillColor="#00000000" android:pathData="M0,9L108,9"
           android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
     <path android:fillColor="#00000000" android:pathData="M0,19L108,19"
@@ -60,8 +62,6 @@
           android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
     <path android:fillColor="#00000000" android:pathData="M0,99L108,99"
           android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
-    
-    <!-- INNER REINFORCEMENT LINES -->
     <path android:fillColor="#00000000" android:pathData="M19,29L89,29"
           android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
     <path android:fillColor="#00000000" android:pathData="M19,39L89,39"
