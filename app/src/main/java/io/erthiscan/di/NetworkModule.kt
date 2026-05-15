@@ -136,43 +136,56 @@ object NetworkModule {
                     return@authenticator null
                 }
 
-                val refresh = authManager.refreshToken ?: return@authenticator null
+                synchronized(authManager) {
+                    // Check if another thread already refreshed the token while we were waiting for the lock.
+                    val failedToken = response.request.header("Authorization")?.removePrefix("Bearer ")
+                    val currentToken = authManager.accessToken
 
-                // PREPARE REFRESH CALL: Synchronous execution within the authenticator thread.
-                val body = json.encodeToString(RefreshRequest.serializer(), RefreshRequest(refresh))
-                    .toRequestBody("application/json".toMediaType())
-                val refreshReq = Request.Builder()
-                    .url("${BuildConfig.API_BASE_URL}auth/refresh")
-                    .post(body)
-                    .build()
+                    if (currentToken != null && currentToken != failedToken) {
+                        return@authenticator response.request.newBuilder()
+                            .header("Authorization", "Bearer $currentToken")
+                            .header("X-Refresh-Attempted", "true")
+                            .build()
+                    }
 
-                val refreshResp = try {
-                    refreshClient.newCall(refreshReq).execute()
-                } catch (_: Exception) {
-                    return@authenticator null
-                }
+                    val refresh = authManager.refreshToken ?: return@authenticator null
 
-                try {
-                    // SESSION TERMINATION: If refresh token is expired/invalid (4xx), force logout.
-                    if (refreshResp.code in 400..499) {
-                        clearSession()
+                    // PREPARE REFRESH CALL: Synchronous execution within the authenticator thread.
+                    val body = json.encodeToString(RefreshRequest.serializer(), RefreshRequest(refresh))
+                        .toRequestBody("application/json".toMediaType())
+                    val refreshReq = Request.Builder()
+                        .url("${BuildConfig.API_BASE_URL}auth/refresh")
+                        .post(body)
+                        .build()
+
+                    val refreshResp = try {
+                        refreshClient.newCall(refreshReq).execute()
+                    } catch (_: Exception) {
                         return@authenticator null
                     }
-                    if (!refreshResp.isSuccessful) return@authenticator null
 
-                    val raw = refreshResp.body.string()
-                    val parsed = json.decodeFromString(RefreshResponse.serializer(), raw)
+                    try {
+                        // SESSION TERMINATION: If refresh token is expired/invalid (4xx), force logout.
+                        if (refreshResp.code in 400..499) {
+                            clearSession()
+                            return@authenticator null
+                        }
+                        if (!refreshResp.isSuccessful) return@authenticator null
 
-                    // ATOMIC UPDATE: Persist new tokens.
-                    authManager.updateTokensFromAuthenticator(parsed.accessToken, parsed.refreshToken)
+                        val raw = refreshResp.body.string()
+                        val parsed = json.decodeFromString(RefreshResponse.serializer(), raw)
 
-                    // RETRY ORIGINAL REQUEST: Re-builds the failed request with the fresh token.
-                    response.request.newBuilder()
-                        .header("Authorization", "Bearer ${parsed.accessToken}")
-                        .header("X-Refresh-Attempted", "true") // Marks request to prevent infinite retry loops.
-                        .build()
-                } finally {
-                    refreshResp.close()
+                        // ATOMIC UPDATE: Persist new tokens.
+                        authManager.updateTokensFromAuthenticator(parsed.accessToken, parsed.refreshToken)
+
+                        // RETRY ORIGINAL REQUEST: Re-builds the failed request with the fresh token.
+                        return@authenticator response.request.newBuilder()
+                            .header("Authorization", "Bearer ${parsed.accessToken}")
+                            .header("X-Refresh-Attempted", "true") // Marks request to prevent infinite retry loops.
+                            .build()
+                    } finally {
+                        refreshResp.close()
+                    }
                 }
             }
             .addInterceptor(logging)
