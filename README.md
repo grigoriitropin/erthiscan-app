@@ -81,5 +81,5 @@ The project uses the **Built-in Kotlin support** (AGP 9.1+) and **Version Catalo
 
 ## Quality Control
 
-- **Static Analysis**: `ruff` style checks (managed by the team) and `Android Lint`.
+- **Static Analysis**: `Android Lint`.
 - **Testing**: JUnit 4 for unit tests and Compose Test for UI verification.
