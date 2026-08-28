@@ -1,3 +1,5 @@
+## Server is Down
+
 # Erthiscan Android App
 
 The official Android client for the **Erthiscan** ethical company scoring platform. This application allows users to scan barcodes (EAN-13) to identify parent companies, view crowdsourced ethical reports, and participate in the community-driven scoring system.
